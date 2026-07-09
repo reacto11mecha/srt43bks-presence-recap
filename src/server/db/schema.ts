@@ -38,6 +38,7 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified")
     .$defaultFn(() => false)
     .notNull(),
+  accountApproved: boolean("account_approved").default(false).notNull(),
   image: text("image"),
   createdAt: timestamp("created_at")
     .$defaultFn(() => /* @__PURE__ */ new Date())
@@ -211,16 +212,13 @@ export const logAbsensi = pgTable(
     status: statusAbsenEnum("status").default("HADIR").notNull(),
     keterangan: text("keterangan"), // Diisi jika status Ijin/Sakit
   },
-  (table) => {
-    return {
-      // GUARDRAIL: Mencegah anak discan dua kali di sesi dan hari yang sama
-      uniqueScan: unique("unique_scan_per_day_session").on(
-        table.tanggal,
-        table.sesiId,
-        table.pesertaDidikId,
-      ),
-    };
-  },
+  (table) => [
+    unique("unique_scan_per_day_session").on(
+      table.tanggal,
+      table.sesiId,
+      table.pesertaDidikId,
+    ),
+  ],
 );
 
 // ==========================================
