@@ -20,6 +20,17 @@ export const statusAbsenEnum = pgEnum("status_absen", [
   "TIDAK_HADIR",
   "IZIN",
   "SAKIT",
+  "ALFA",
+]);
+export const tipeKategoriEnum = pgEnum("tipe_kategori", [
+  "RUTIN",
+  "PELANGGARAN",
+]);
+export const tingkatPelanggaranEnum = pgEnum("tingkat_pelanggaran", [
+  "TIDAK_ADA",
+  "RINGAN",
+  "SEDANG",
+  "BERAT",
 ]);
 export const statusPesertaEnum = pgEnum("status_peserta", [
   "AKTIF",
@@ -110,6 +121,15 @@ export const kategoriAbsensi = pgTable("kategori_absensi", {
     .$defaultFn(() => crypto.randomUUID()),
   namaKategori: text("nama_kategori").notNull(), // Solat, Makan, Kegiatan
   isActive: boolean("is_active").default(true).notNull(),
+
+  tipe: tipeKategoriEnum("tipe").default("RUTIN").notNull(),
+  tingkatPelanggaran: tingkatPelanggaranEnum("tingkat_pelanggaran")
+    .default("TIDAK_ADA")
+    .notNull(),
+  poinDefault: integer("poin_default").notNull(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const sesiAbsensi = pgTable("sesi_absensi", {
@@ -202,11 +222,21 @@ export const logAbsensi = pgTable(
     pesertaDidikId: text("peserta_didik_id")
       .notNull()
       .references(() => pesertaDidik.id, { onDelete: "cascade" }),
-    sesiId: text("sesi_id")
+
+    kategoriId: text("kategori_id")
       .notNull()
-      .references(() => sesiAbsensi.id, { onDelete: "cascade" }),
+      .references(() => kategoriAbsensi.id, { onDelete: "restrict" }),
+
+    sesiId: text("sesi_id").references(() => sesiAbsensi.id, {
+      onDelete: "cascade",
+    }),
+
+    waliAsuhId: text("wali_asuh_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
 
     tanggal: date("tanggal").notNull(),
+    poinDidapat: integer("poin_didapat").notNull(),
     waktuScan: timestamp("waktu_scan").notNull(),
 
     status: statusAbsenEnum("status").default("HADIR").notNull(),
@@ -277,8 +307,16 @@ export const logAbsensiRelations = relations(logAbsensi, ({ one }) => ({
     fields: [logAbsensi.pesertaDidikId],
     references: [pesertaDidik.id],
   }),
+  kategori: one(kategoriAbsensi, {
+    fields: [logAbsensi.kategoriId],
+    references: [kategoriAbsensi.id],
+  }),
   sesi: one(sesiAbsensi, {
     fields: [logAbsensi.sesiId],
     references: [sesiAbsensi.id],
+  }),
+  waliAsuh: one(user, {
+    fields: [logAbsensi.waliAsuhId],
+    references: [user.id],
   }),
 }));
