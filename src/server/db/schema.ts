@@ -15,16 +15,13 @@ import {
 // ENUMS
 // ==========================================
 export const jenjangEnum = pgEnum("jenjang", ["SD", "SMP", "SMA"]);
+export const statusWaktuEnum = pgEnum("status_waktu", ["TEPAT_WAKTU", "TELAT"]);
 export const statusAbsenEnum = pgEnum("status_absen", [
   "HADIR",
   "TIDAK_HADIR",
   "IZIN",
   "SAKIT",
   "ALFA",
-]);
-export const tipeKategoriEnum = pgEnum("tipe_kategori", [
-  "RUTIN",
-  "PELANGGARAN",
 ]);
 export const tingkatPelanggaranEnum = pgEnum("tingkat_pelanggaran", [
   "TIDAK_ADA",
@@ -119,17 +116,8 @@ export const kategoriAbsensi = pgTable("kategori_absensi", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  namaKategori: text("nama_kategori").notNull(), // Solat, Makan, Kegiatan
+  namaKategori: text("nama_kategori").notNull(), // Contoh: Solat, Makan, Kegiatan
   isActive: boolean("is_active").default(true).notNull(),
-
-  tipe: tipeKategoriEnum("tipe").default("RUTIN").notNull(),
-  tingkatPelanggaran: tingkatPelanggaranEnum("tingkat_pelanggaran")
-    .default("TIDAK_ADA")
-    .notNull(),
-  poinDefault: integer("poin_default").notNull(),
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const sesiAbsensi = pgTable("sesi_absensi", {
@@ -138,10 +126,32 @@ export const sesiAbsensi = pgTable("sesi_absensi", {
     .$defaultFn(() => crypto.randomUUID()),
   kategoriId: text("kategori_id")
     .notNull()
-    .references(() => kategoriAbsensi.id, { onDelete: "cascade" }),
-  namaSesi: text("nama_sesi").notNull(), // Subuh, Makan Siang, Apel Pagi
-  waktuMulai: time("waktu_mulai"),
-  waktuSelesai: time("waktu_selesai"),
+    .references(() => kategoriAbsensi.id, { onDelete: "restrict" }),
+
+  namaSesi: text("nama_sesi").notNull(),
+  waktuMulai: time("waktu_mulai").notNull(),
+  waktuSelesai: time("waktu_selesai").notNull(),
+
+  isMandatory: boolean("is_mandatory").default(true).notNull(),
+
+  targetJenjang: jenjangEnum("target_jenjang").array().notNull(),
+
+  poinTepatWaktu: integer("poin_tepat_waktu").notNull(),
+  poinTelat: integer("poin_telat").notNull(),
+
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+// ==========================================
+// MASTER DATA: PELANGGARAN
+// ==========================================
+export const masterPelanggaran = pgTable("master_pelanggaran", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  namaPelanggaran: text("nama_pelanggaran").notNull(),
+  tingkat: tingkatPelanggaranEnum("tingkat").notNull(), // RINGAN, SEDANG, BERAT
+  poinMinus: integer("poin_minus").notNull(), // Bobot poin (biasanya negatif)
   isActive: boolean("is_active").default(true).notNull(),
 });
 
@@ -162,6 +172,8 @@ export const pesertaDidik = pgTable("peserta_didik", {
 
   // Identitas Utama (NIPD digunakan untuk generate/scan QR Code)
   nipd: text("nipd").notNull().unique(),
+  // Future feature, contoh isi: "A1B2C3D4" (Hex UID Mifare)
+  uidKartu: text("uid_kartu").unique(),
   nisn: text("nisn").unique(),
   namaLengkap: text("nama_lengkap").notNull(),
 
@@ -222,27 +234,38 @@ export const logAbsensi = pgTable(
     pesertaDidikId: text("peserta_didik_id")
       .notNull()
       .references(() => pesertaDidik.id, { onDelete: "cascade" }),
-
-    kategoriId: text("kategori_id")
-      .notNull()
-      .references(() => kategoriAbsensi.id, { onDelete: "restrict" }),
-
-    sesiId: text("sesi_id").references(() => sesiAbsensi.id, {
-      onDelete: "cascade",
-    }),
-
     waliAsuhId: text("wali_asuh_id").references(() => user.id, {
       onDelete: "set null",
     }),
 
+    // RELASI FLEKSIBEL (Hanya salah satu yang terisi)
+    sesiId: text("sesi_id").references(() => sesiAbsensi.id, {
+      onDelete: "restrict",
+    }),
+    pelanggaranId: text("pelanggaran_id").references(
+      () => masterPelanggaran.id,
+      { onDelete: "restrict" },
+    ),
+
     tanggal: date("tanggal").notNull(),
-    poinDidapat: integer("poin_didapat").notNull(),
     waktuScan: timestamp("waktu_scan").notNull(),
 
-    status: statusAbsenEnum("status").default("HADIR").notNull(),
-    keterangan: text("keterangan"), // Diisi jika status Ijin/Sakit
+    // STATUS (Untuk absensi rutin)
+    statusKehadiran: statusAbsenEnum("status_kehadiran")
+      .default("HADIR")
+      .notNull(),
+    statusWaktu: statusWaktuEnum("status_waktu"), // Terisi 'TEPAT_WAKTU' atau 'TELAT' jika HADIR
+
+    // Penanda apakah poin ini hasil ketetapan sistem atau diedit manual oleh Wali Asuh
+    isPoinManual: boolean("is_poin_manual").default(false).notNull(),
+
+    // HASIL POIN
+    poinDidapat: integer("poin_didapat").notNull(),
+    keterangan: text("keterangan"), // Kronologi pelanggaran / Alasan Sakit
   },
   (table) => [
+    // Mencegah duplikasi absen rutin pada sesi yang sama di hari yang sama
+    // Null pada pelanggaranId tidak akan memicu konflik unique constraint
     unique("unique_scan_per_day_session").on(
       table.tanggal,
       table.sesiId,
@@ -287,6 +310,32 @@ export const sesiAbsensiRelations = relations(sesiAbsensi, ({ one, many }) => ({
   logAbsensi: many(logAbsensi),
 }));
 
+export const masterPelanggaranRelations = relations(
+  masterPelanggaran,
+  ({ many }) => ({
+    logAbsensi: many(logAbsensi),
+  }),
+);
+
+export const logAbsensiRelations = relations(logAbsensi, ({ one }) => ({
+  pesertaDidik: one(pesertaDidik, {
+    fields: [logAbsensi.pesertaDidikId],
+    references: [pesertaDidik.id],
+  }),
+  waliAsuh: one(user, {
+    fields: [logAbsensi.waliAsuhId],
+    references: [user.id],
+  }),
+  sesi: one(sesiAbsensi, {
+    fields: [logAbsensi.sesiId],
+    references: [sesiAbsensi.id],
+  }),
+  pelanggaran: one(masterPelanggaran, {
+    fields: [logAbsensi.pelanggaranId],
+    references: [masterPelanggaran.id],
+  }),
+}));
+
 export const pesertaDidikRelations = relations(
   pesertaDidik,
   ({ one, many }) => ({
@@ -301,22 +350,3 @@ export const pesertaDidikRelations = relations(
     logAbsensi: many(logAbsensi),
   }),
 );
-
-export const logAbsensiRelations = relations(logAbsensi, ({ one }) => ({
-  pesertaDidik: one(pesertaDidik, {
-    fields: [logAbsensi.pesertaDidikId],
-    references: [pesertaDidik.id],
-  }),
-  kategori: one(kategoriAbsensi, {
-    fields: [logAbsensi.kategoriId],
-    references: [kategoriAbsensi.id],
-  }),
-  sesi: one(sesiAbsensi, {
-    fields: [logAbsensi.sesiId],
-    references: [sesiAbsensi.id],
-  }),
-  waliAsuh: one(user, {
-    fields: [logAbsensi.waliAsuhId],
-    references: [user.id],
-  }),
-}));

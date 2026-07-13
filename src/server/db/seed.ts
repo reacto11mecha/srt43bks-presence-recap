@@ -1,165 +1,272 @@
 import { db } from "./index";
-import { kategoriAbsensi, sesiAbsensi } from "./schema";
+import { kategoriAbsensi, sesiAbsensi, masterPelanggaran } from "./schema";
+import crypto from "crypto";
 
 async function main() {
-  console.log("⏳ Memulai proses seeding database...");
+  console.log("⏳ Memulai proses seeding database dengan skema baru...");
 
   try {
     // ==========================================
-    // 1. PREPARE DATA KATEGORI ABSENSI & PELANGGARAN
+    // 1. SEEDING KATEGORI UTAMA
     // ==========================================
-    console.log("Mempersiapkan data Kategori Absensi dan Pelanggaran...");
+    console.log("Mempersiapkan data Kategori Absensi...");
 
-    // Fungsi bantu untuk membuat object kategori
-    const createKategori = (
-      namaKategori: string,
-      tipe: "RUTIN" | "PELANGGARAN",
-      tingkatPelanggaran: "TIDAK_ADA" | "RINGAN" | "SEDANG" | "BERAT",
-      poinDefault: number,
-    ) => ({
-      id: crypto.randomUUID(),
-      namaKategori,
-      tipe,
-      tingkatPelanggaran,
-      poinDefault,
-      isActive: true,
-    });
+    const katSolatId = crypto.randomUUID();
+    const katMakanId = crypto.randomUUID();
+    const katKegiatanId = crypto.randomUUID();
 
-    // Master Data Rutin
-    const subuh = createKategori("Shalat Subuh", "RUTIN", "TIDAK_ADA", 25);
-    const dhuha = createKategori("Shalat Dhuha", "RUTIN", "TIDAK_ADA", 15);
-    const zuhur = createKategori("Shalat Zuhur", "RUTIN", "TIDAK_ADA", 15);
-    const ashar = createKategori("Shalat Ashar", "RUTIN", "TIDAK_ADA", 15);
-    const maghrib = createKategori("Shalat Maghrib", "RUTIN", "TIDAK_ADA", 15);
-    const isya = createKategori("Shalat Isya", "RUTIN", "TIDAK_ADA", 15);
+    const dataKategori = [
+      { id: katSolatId, namaKategori: "Absen Solat", isActive: true },
+      { id: katMakanId, namaKategori: "Absen Makan", isActive: true },
+      { id: katKegiatanId, namaKategori: "Absen Kegiatan", isActive: true },
+    ];
 
-    const makanPagi = createKategori("Makan Pagi", "RUTIN", "TIDAK_ADA", 30);
-    const makanSiang = createKategori("Makan Siang", "RUTIN", "TIDAK_ADA", 30);
-    const makanMalam = createKategori("Makan Malam", "RUTIN", "TIDAK_ADA", 30);
+    await db.insert(kategoriAbsensi).values(dataKategori).onConflictDoNothing();
+    console.log("✅ Data Kategori Induk berhasil dimasukkan.");
 
-    const istirahatTepat = createKategori(
-      "Istirahat Malam (Tepat Waktu)",
-      "RUTIN",
-      "TIDAK_ADA",
-      85,
-    );
+    // ==========================================
+    // 2. SEEDING MASTER PELANGGARAN
+    // ==========================================
+    console.log("Mempersiapkan data Master Pelanggaran...");
 
-    // Master Data Pelanggaran
-    const istirahatTelat = createKategori(
-      "Istirahat Malam (Tidak Tepat Waktu)",
-      "PELANGGARAN",
-      "RINGAN",
-      -50,
-    );
-    const kataKasar = createKategori(
-      "Berkata Kasar",
-      "PELANGGARAN",
-      "RINGAN",
-      -10,
-    );
-    const rusakFasilitas = createKategori(
-      "Merusak Fasilitas",
-      "PELANGGARAN",
-      "SEDANG",
-      -30,
-    );
-    const pacaran = createKategori("Pacaran", "PELANGGARAN", "BERAT", -100);
-
-    const semuaKategori = [
-      subuh,
-      dhuha,
-      zuhur,
-      ashar,
-      maghrib,
-      isya,
-      makanPagi,
-      makanSiang,
-      makanMalam,
-      istirahatTepat,
-      istirahatTelat,
-      kataKasar,
-      rusakFasilitas,
-      pacaran,
+    const dataPelanggaran = [
+      {
+        id: crypto.randomUUID(),
+        namaPelanggaran: "Pelanggaran Ringan",
+        tingkat: "RINGAN" as const,
+        poinMinus: -15, // Poin minus murni
+        isActive: true,
+      },
+      {
+        id: crypto.randomUUID(),
+        namaPelanggaran: "Pelanggaran Sedang",
+        tingkat: "SEDANG" as const,
+        poinMinus: -50,
+        isActive: true,
+      },
+      {
+        id: crypto.randomUUID(),
+        namaPelanggaran: "Pelanggaran Berat",
+        tingkat: "BERAT" as const,
+        poinMinus: -150,
+        isActive: true,
+      },
     ];
 
     await db
-      .insert(kategoriAbsensi)
-      .values(semuaKategori)
+      .insert(masterPelanggaran)
+      .values(dataPelanggaran)
       .onConflictDoNothing();
-    console.log("✅ Data Kategori Absensi berhasil dimasukkan.");
+    console.log("✅ Data Master Pelanggaran berhasil dimasukkan.");
 
     // ==========================================
-    // 2. SEEDING SESI ABSENSI
+    // 3. SEEDING SESI ABSENSI (JADWAL)
     // ==========================================
-    console.log("Mempersiapkan data Sesi Absensi...");
+    console.log("Mempersiapkan data Sesi Jadwal...");
 
-    // Pelanggaran tidak dimasukkan ke dalam sesi karena bersifat insidental/spontan
+    const semuaJenjang = ["SD", "SMP", "SMA"] as ("SD" | "SMP" | "SMA")[];
+
     const dataSesi = [
+      // --- KELOMPOK: ABSEN SOLAT (Wajib: Telat = Minus) ---
       {
-        kategoriId: subuh.id,
-        namaSesi: "Sesi Shalat Subuh",
-        waktuMulai: "04:00:00",
-        waktuSelesai: "05:00:00",
+        id: crypto.randomUUID(),
+        kategoriId: katSolatId,
+        namaSesi: "Subuh",
+        waktuMulai: "04:30:00",
+        waktuSelesai: "05:15:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 25,
+        poinTelat: -10, // Telat subuh dikurangi 10 poin
       },
       {
-        kategoriId: dhuha.id,
-        namaSesi: "Sesi Shalat Dhuha",
-        waktuMulai: "07:00:00",
-        waktuSelesai: "11:00:00",
+        id: crypto.randomUUID(),
+        kategoriId: katSolatId,
+        namaSesi: "Dhuha",
+        waktuMulai: "06:30:00",
+        waktuSelesai: "10:30:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 15,
+        poinTelat: -5,
       },
       {
-        kategoriId: zuhur.id,
-        namaSesi: "Sesi Shalat Zuhur",
+        id: crypto.randomUUID(),
+        kategoriId: katSolatId,
+        namaSesi: "Zuhur",
         waktuMulai: "12:00:00",
         waktuSelesai: "13:00:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 15,
+        poinTelat: -5,
       },
       {
-        kategoriId: ashar.id,
-        namaSesi: "Sesi Shalat Ashar",
-        waktuMulai: "15:00:00",
+        id: crypto.randomUUID(),
+        kategoriId: katSolatId,
+        namaSesi: "Ashar",
+        waktuMulai: "15:15:00",
         waktuSelesai: "16:00:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 15,
+        poinTelat: -5,
       },
       {
-        kategoriId: maghrib.id,
-        namaSesi: "Sesi Shalat Maghrib",
+        id: crypto.randomUUID(),
+        kategoriId: katSolatId,
+        namaSesi: "Magrib",
         waktuMulai: "18:00:00",
-        waktuSelesai: "19:00:00",
+        waktuSelesai: "18:45:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 15,
+        poinTelat: -5,
       },
       {
-        kategoriId: isya.id,
-        namaSesi: "Sesi Shalat Isya",
-        waktuMulai: "19:30:00",
-        waktuSelesai: "20:30:00",
+        id: crypto.randomUUID(),
+        kategoriId: katSolatId,
+        namaSesi: "Isya",
+        waktuMulai: "19:15:00",
+        waktuSelesai: "20:00:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 15,
+        poinTelat: -5,
       },
+
+      // --- KELOMPOK: ABSEN MAKAN (Wajib: Telat = Minus) ---
       {
-        kategoriId: makanPagi.id,
-        namaSesi: "Sesi Makan Pagi",
+        id: crypto.randomUUID(),
+        kategoriId: katMakanId,
+        namaSesi: "Makan Pagi",
         waktuMulai: "05:30:00",
-        waktuSelesai: "06:30:00",
+        waktuSelesai: "06:15:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 30,
+        poinTelat: -10,
       },
       {
-        kategoriId: makanSiang.id,
-        namaSesi: "Sesi Makan Siang",
+        id: crypto.randomUUID(),
+        kategoriId: katMakanId,
+        namaSesi: "Makan Siang",
         waktuMulai: "13:00:00",
         waktuSelesai: "14:00:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 30,
+        poinTelat: -10,
       },
       {
-        kategoriId: makanMalam.id,
-        namaSesi: "Sesi Makan Malam",
-        waktuMulai: "19:00:00",
-        waktuSelesai: "19:30:00",
+        id: crypto.randomUUID(),
+        kategoriId: katMakanId,
+        namaSesi: "Makan Malam",
+        waktuMulai: "18:45:00",
+        waktuSelesai: "19:15:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 30,
+        poinTelat: -10,
+      },
+
+      // --- KELOMPOK: ABSEN KEGIATAN (Wajib: Telat = Minus) ---
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Apel Pagi",
+        waktuMulai: "06:15:00",
+        waktuSelesai: "06:45:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 20,
+        poinTelat: -10,
       },
       {
-        kategoriId: istirahatTepat.id,
-        namaSesi: "Sesi Istirahat Malam",
-        waktuMulai: "21:00:00",
-        waktuSelesai: "04:00:00",
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Apel Siang",
+        waktuMulai: "14:00:00",
+        waktuSelesai: "14:30:00",
+        isMandatory: true,
+        targetJenjang: ["SD"] as ("SD" | "SMP" | "SMA")[],
+        poinTepatWaktu: 20,
+        poinTelat: -10,
+      },
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Apel Sore",
+        waktuMulai: "16:00:00",
+        waktuSelesai: "16:30:00",
+        isMandatory: true,
+        targetJenjang: ["SMP", "SMA"] as ("SD" | "SMP" | "SMA")[],
+        poinTepatWaktu: 20,
+        poinTelat: -10,
+      },
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Mentoring",
+        waktuMulai: "20:00:00",
+        waktuSelesai: "21:00:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 25,
+        poinTelat: -15, // Telat mentoring poin minus lebih besar
+      },
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Tidur",
+        waktuMulai: "21:30:00",
+        waktuSelesai: "22:00:00",
+        isMandatory: true,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 85,
+        poinTelat: -50, // Denda sangat besar jika keluyuran di jam tidur
+      },
+
+      // --- KELOMPOK: KEGIATAN LAINNYA (Tidak Wajib: Telat = 0) ---
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Kegiatan Tambahan 1",
+        waktuMulai: "08:00:00",
+        waktuSelesai: "10:00:00",
+        isMandatory: false,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 10, // Tambahan poin murni
+        poinTelat: 0, // Karena tidak wajib, telat tidak didenda
+      },
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Kegiatan Tambahan 2",
+        waktuMulai: "10:00:00",
+        waktuSelesai: "11:30:00",
+        isMandatory: false,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 10,
+        poinTelat: 0,
+      },
+      {
+        id: crypto.randomUUID(),
+        kategoriId: katKegiatanId,
+        namaSesi: "Kegiatan Tambahan 3",
+        waktuMulai: "16:30:00",
+        waktuSelesai: "17:30:00",
+        isMandatory: false,
+        targetJenjang: semuaJenjang,
+        poinTepatWaktu: 10,
+        poinTelat: 0,
       },
     ];
 
     await db.insert(sesiAbsensi).values(dataSesi).onConflictDoNothing();
-    console.log("✅ Data Sesi Absensi berhasil dimasukkan.");
-    console.log("🎉 Seeding selesai!");
+    console.log("✅ Data Sesi Jadwal berhasil dimasukkan.");
+
+    console.log("🎉 Proses Seeding Selesai!");
     process.exit();
   } catch (error) {
     console.error("❌ Terjadi kesalahan saat seeding:", error);

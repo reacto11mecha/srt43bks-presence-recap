@@ -1,10 +1,18 @@
+// src/server/api/routers/pengaturan.ts
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { user, kategoriAbsensi, sesiAbsensi } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  user,
+  kategoriAbsensi,
+  sesiAbsensi,
+  masterPelanggaran,
+} from "~/server/db/schema";
+import { eq, asc } from "drizzle-orm";
 
 export const pengaturanRouter = createTRPCRouter({
-  // --- MANAJEMEN AKUN ---
+  // ==========================================
+  // MANAJEMEN AKUN
+  // ==========================================
   getAllUsers: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.query.user.findMany({
       orderBy: (users, { desc }) => [desc(users.createdAt)],
@@ -21,35 +29,43 @@ export const pengaturanRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // --- MANAJEMEN KATEGORI & SESI (NESTED) ---
+  // ==========================================
+  // READ DATA (Untuk ditampilkan di tabel Pengaturan)
+  // ==========================================
   getKategoriWithSesi: protectedProcedure.query(async ({ ctx }) => {
-    // Mengambil kategori sekaligus sesi yang terelasi di dalamnya
     return ctx.db.query.kategoriAbsensi.findMany({
       with: {
-        sesi: true,
+        sesi: {
+          orderBy: (sesi, { asc }) => [asc(sesi.waktuMulai)],
+        },
       },
-      orderBy: (kategori, { asc }) => [asc(kategori.namaKategori)],
+      orderBy: [asc(kategoriAbsensi.namaKategori)],
+    });
+  }),
+
+  getMasterPelanggaran: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.masterPelanggaran.findMany({
+      orderBy: [
+        asc(masterPelanggaran.tingkat),
+        asc(masterPelanggaran.namaPelanggaran),
+      ],
     });
   }),
 
   // ==========================================
-  // CRUD KATEGORI ABSENSI
+  // CRUD KATEGORI ABSENSI (Induk)
   // ==========================================
   createKategori: protectedProcedure
     .input(
       z.object({
         namaKategori: z.string().min(1, "Nama Kategori wajib diisi"),
-        tipe: z.enum(["RUTIN", "PELANGGARAN"]),
-        tingkatPelanggaran: z.enum(["TIDAK_ADA", "RINGAN", "SEDANG", "BERAT"]),
-        poinDefault: z.number(),
+        isActive: z.boolean().default(true),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.db.insert(kategoriAbsensi).values({
         namaKategori: input.namaKategori,
-        tipe: input.tipe,
-        tingkatPelanggaran: input.tingkatPelanggaran,
-        poinDefault: input.poinDefault,
+        isActive: input.isActive,
       });
     }),
 
@@ -57,10 +73,8 @@ export const pengaturanRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        namaKategori: z.string().min(1),
-        tipe: z.enum(["RUTIN", "PELANGGARAN"]),
-        tingkatPelanggaran: z.enum(["TIDAK_ADA", "RINGAN", "SEDANG", "BERAT"]),
-        poinDefault: z.number(),
+        namaKategori: z.string().min(1, "Nama Kategori wajib diisi"),
+        isActive: z.boolean(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -68,9 +82,7 @@ export const pengaturanRouter = createTRPCRouter({
         .update(kategoriAbsensi)
         .set({
           namaKategori: input.namaKategori,
-          tipe: input.tipe,
-          tingkatPelanggaran: input.tingkatPelanggaran,
-          poinDefault: input.poinDefault,
+          isActive: input.isActive,
         })
         .where(eq(kategoriAbsensi.id, input.id));
     }),
@@ -84,7 +96,7 @@ export const pengaturanRouter = createTRPCRouter({
     }),
 
   // ==========================================
-  // CRUD SESI ABSENSI
+  // CRUD SESI ABSENSI (Anak dari Kategori)
   // ==========================================
   createSesi: protectedProcedure
     .input(
@@ -93,18 +105,40 @@ export const pengaturanRouter = createTRPCRouter({
         namaSesi: z.string().min(1, "Nama Sesi wajib diisi"),
         waktuMulai: z
           .string()
-          .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Format waktu salah"),
+          .regex(
+            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
+            "Format waktu salah",
+          ),
         waktuSelesai: z
           .string()
-          .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Format waktu salah"),
+          .regex(
+            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
+            "Format waktu salah",
+          ),
+        isMandatory: z.boolean(),
+        targetJenjang: z
+          .array(z.enum(["SD", "SMP", "SMA"]))
+          .min(1, "Pilih minimal 1 jenjang"),
+        poinTepatWaktu: z.number(),
+        poinTelat: z.number(),
+        isActive: z.boolean().default(true),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Pastikan format jam memiliki detik untuk tipe data 'time' Postgres, cth: "15:30:00"
+      const formatTime = (timeStr: string) =>
+        timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+
       await ctx.db.insert(sesiAbsensi).values({
         kategoriId: input.kategoriId,
         namaSesi: input.namaSesi,
-        waktuMulai: input.waktuMulai,
-        waktuSelesai: input.waktuSelesai,
+        waktuMulai: formatTime(input.waktuMulai),
+        waktuSelesai: formatTime(input.waktuSelesai),
+        isMandatory: input.isMandatory,
+        targetJenjang: input.targetJenjang,
+        poinTepatWaktu: input.poinTepatWaktu,
+        poinTelat: input.poinTelat,
+        isActive: input.isActive,
       });
     }),
 
@@ -112,18 +146,43 @@ export const pengaturanRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        namaSesi: z.string().min(1),
-        waktuMulai: z.string(),
-        waktuSelesai: z.string(),
+        namaSesi: z.string().min(1, "Nama Sesi wajib diisi"),
+        waktuMulai: z
+          .string()
+          .regex(
+            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
+            "Format waktu salah",
+          ),
+        waktuSelesai: z
+          .string()
+          .regex(
+            /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/,
+            "Format waktu salah",
+          ),
+        isMandatory: z.boolean(),
+        targetJenjang: z
+          .array(z.enum(["SD", "SMP", "SMA"]))
+          .min(1, "Pilih minimal 1 jenjang"),
+        poinTepatWaktu: z.number(),
+        poinTelat: z.number(),
+        isActive: z.boolean(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const formatTime = (timeStr: string) =>
+        timeStr.length === 5 ? `${timeStr}:00` : timeStr;
+
       await ctx.db
         .update(sesiAbsensi)
         .set({
           namaSesi: input.namaSesi,
-          waktuMulai: input.waktuMulai,
-          waktuSelesai: input.waktuSelesai,
+          waktuMulai: formatTime(input.waktuMulai),
+          waktuSelesai: formatTime(input.waktuSelesai),
+          isMandatory: input.isMandatory,
+          targetJenjang: input.targetJenjang,
+          poinTepatWaktu: input.poinTepatWaktu,
+          poinTelat: input.poinTelat,
+          isActive: input.isActive,
         })
         .where(eq(sesiAbsensi.id, input.id));
     }),
@@ -132,5 +191,56 @@ export const pengaturanRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(sesiAbsensi).where(eq(sesiAbsensi.id, input.id));
+    }),
+
+  // ==========================================
+  // CRUD MASTER PELANGGARAN
+  // ==========================================
+  createPelanggaran: protectedProcedure
+    .input(
+      z.object({
+        namaPelanggaran: z.string().min(1, "Nama Pelanggaran wajib diisi"),
+        tingkat: z.enum(["RINGAN", "SEDANG", "BERAT"]),
+        poinMinus: z.number(),
+        isActive: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.insert(masterPelanggaran).values({
+        namaPelanggaran: input.namaPelanggaran,
+        tingkat: input.tingkat,
+        poinMinus: input.poinMinus,
+        isActive: input.isActive,
+      });
+    }),
+
+  updatePelanggaran: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        namaPelanggaran: z.string().min(1, "Nama Pelanggaran wajib diisi"),
+        tingkat: z.enum(["RINGAN", "SEDANG", "BERAT"]),
+        poinMinus: z.number(),
+        isActive: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(masterPelanggaran)
+        .set({
+          namaPelanggaran: input.namaPelanggaran,
+          tingkat: input.tingkat,
+          poinMinus: input.poinMinus,
+          isActive: input.isActive,
+        })
+        .where(eq(masterPelanggaran.id, input.id));
+    }),
+
+  deletePelanggaran: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .delete(masterPelanggaran)
+        .where(eq(masterPelanggaran.id, input.id));
     }),
 });
