@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileText, Settings, ScrollText } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Settings,
+  ScrollText,
+} from "lucide-react";
 import { cn } from "~/lib/utils";
 
 export function Sidebar() {
@@ -12,7 +18,11 @@ export function Sidebar() {
   const menus = [
     { name: "Ringkasan", href: "/dashboard", icon: LayoutDashboard },
 
-    { name: "Aktivitas Absensi", href: "/dashboard/aktivitas", icon: ScrollText },
+    {
+      name: "Aktivitas Absensi",
+      href: "/dashboard/aktivitas",
+      icon: ScrollText,
+    },
     { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
     { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
     {

@@ -90,7 +90,6 @@ export default function AktivitasAbsensiPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* ... [KODE TABLE ANDA SAMA SEPERTI SEBELUMNYA DI SINI] ... */}
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -133,7 +132,7 @@ export default function AktivitasAbsensiPage() {
                         </span>
                         <br />
                         <span className="text-muted-foreground text-xs">
-                          NISN: {log.pesertaDidik.nisn}
+                          NIPD: {log.pesertaDidik.nipd}
                         </span>
                       </TableCell>
 

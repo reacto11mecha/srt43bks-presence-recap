@@ -87,8 +87,12 @@ export const getPesertaColumns = ({
     accessorKey: "kelas",
     header: "Kelas",
     cell: ({ row }) => (
-      <span className="font-mono">
-        {`${row.original.kelas.jenjang} | ${row.original.kelas.tingkat} | ${row.original.kelas.namaKelas}`}
+      <span>
+        {row.original.kelas.tingkat} {row.original.kelas.namaKelas}
+        <br />
+        <span className="text-muted-foreground text-xs">
+          {row.original.kelas.jenjang}
+        </span>
       </span>
     ),
   },

@@ -57,15 +57,18 @@ export function UserNav() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link
-              href="/dashboard/akun"
-              className="flex w-full cursor-pointer items-center"
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Pengaturan Akun</span>
-            </Link>
-          </DropdownMenuItem>
+          <DropdownMenuItem
+            render={
+              <Link
+                href="/dashboard/akun"
+                className="flex w-full cursor-pointer items-center"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Pengaturan Akun</span>
+              </Link>
+            }
+            nativeButton={false}
+          />
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
