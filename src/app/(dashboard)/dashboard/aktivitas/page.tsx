@@ -1,11 +1,7 @@
 // src/app/(dashboard)/dashboard/aktivitas/page.tsx
 "use client";
 
-import { useState } from "react";
 import { api } from "~/trpc/react";
-import { format } from "date-fns";
-import { id } from "date-fns/locale";
-import { Plus } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -15,192 +11,168 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-
-// Import Komponen Dialog Manual
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { format } from "date-fns";
+import { id } from "date-fns/locale";
 import { ManualLogFormDialog } from "~/_components/aktivitas/manual-log-form-dialog";
 
-export default function AktivitasAbsensiPage() {
+export default function AktivitasPage() {
   const { data: logs, isLoading } = api.aktivitas.getRecentLogs.useQuery();
-  const [isManualModalOpen, setIsManualModalOpen] = useState(false); // State kontrol modal
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "HADIR":
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-            Hadir
-          </Badge>
-        );
-      case "SAKIT":
-        return (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-            Sakit
-          </Badge>
-        );
-      case "IZIN":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            Izin
-          </Badge>
-        );
-      case "ALFA":
-        return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
-            Alfa
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Aktivitas Absensi
+            Aktivitas Absensi & Kedisiplinan
           </h1>
           <p className="text-muted-foreground">
-            Log real-time absensi harian dan pencatatan pelanggaran peserta
-            didik.
+            Riwayat log absensi, kegiatan, dan pelanggaran terbaru.
           </p>
         </div>
-
-        {/* Tombol pemicu Modal Manual Input */}
-        <Button onClick={() => setIsManualModalOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Input Manual
-        </Button>
+        <ManualLogFormDialog />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Riwayat Terbaru</CardTitle>
-          <CardDescription>
-            Menampilkan 100 aktivitas terakhir yang tercatat di sistem.
-          </CardDescription>
+          <CardTitle>Log Terbaru (100 Teratas)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Waktu</TableHead>
-                  <TableHead>Nama Peserta</TableHead>
-                  <TableHead>Kelas</TableHead>
-                  <TableHead>Kategori / Sesi</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Poin</TableHead>
-                  <TableHead>Keterangan</TableHead>
-                  <TableHead>Pencatat</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
+          {isLoading ? (
+            <p className="text-muted-foreground text-sm">Memuat data...</p>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      Memuat data aktivitas...
-                    </TableCell>
+                    <TableHead>Waktu & Tanggal</TableHead>
+                    <TableHead>Siswa</TableHead>
+                    <TableHead>Aktivitas / Pelanggaran</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Poin</TableHead>
+                    <TableHead>Keterangan</TableHead>
+                    <TableHead>Pencatat</TableHead>
                   </TableRow>
-                ) : logs?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      Belum ada aktivitas yang tercatat.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  logs?.map((log) => (
+                </TableHeader>
+                <TableBody>
+                  {logs?.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {format(new Date(log.waktuScan), "dd MMM yyyy, HH:mm", {
-                          locale: id,
-                        })}
+                      <TableCell className="whitespace-nowrap">
+                        <div className="font-medium">
+                          {format(new Date(log.waktuScan), "HH:mm:ss")}
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          {format(new Date(log.tanggal), "dd MMM yyyy", {
+                            locale: id,
+                          })}
+                        </div>
                       </TableCell>
 
                       <TableCell>
-                        <span className="font-semibold">
+                        <div className="font-medium">
                           {log.pesertaDidik.namaLengkap}
-                        </span>
-                        <br />
-                        <span className="text-muted-foreground text-xs">
-                          NIPD: {log.pesertaDidik.nipd}
-                        </span>
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          {log.pesertaDidik.kelas.jenjang}{" "}
+                          {log.pesertaDidik.kelas.tingkat}{" "}
+                          {log.pesertaDidik.kelas.namaKelas}
+                        </div>
                       </TableCell>
 
                       <TableCell>
-                        {log.pesertaDidik.kelas.tingkat}{" "}
-                        {log.pesertaDidik.kelas.namaKelas}
-                        <br />
-                        <span className="text-muted-foreground text-xs">
-                          {log.pesertaDidik.kelas.jenjang}
-                        </span>
-                      </TableCell>
-
-                      <TableCell>
-                        <span className="font-medium">
-                          {log.kategori.namaKategori}
-                        </span>
-                        {log.kategori.tipe === "PELANGGARAN" && (
-                          <Badge
-                            variant="destructive"
-                            className="ml-2 h-4 px-1 py-0 text-[10px]"
-                          >
-                            Pelanggaran
-                          </Badge>
+                        {log.sesi ? (
+                          <div>
+                            <span className="font-medium">
+                              {log.sesi.kategori.namaKategori}
+                            </span>
+                            <span className="text-muted-foreground mx-1">
+                              •
+                            </span>
+                            <span>{log.sesi.namaSesi}</span>
+                          </div>
+                        ) : log.pelanggaran ? (
+                          <div className="flex items-center gap-2 font-medium text-red-600">
+                            {log.pelanggaran.namaPelanggaran}
+                            <Badge
+                              variant="destructive"
+                              className="h-4 px-1 py-0 text-[10px]"
+                            >
+                              {log.pelanggaran.tingkat}
+                            </Badge>
+                          </div>
+                        ) : (
+                          "-"
                         )}
-                        <br />
-                        <span className="text-muted-foreground text-xs">
-                          {log.sesi ? log.sesi.namaSesi : "-"}
-                        </span>
                       </TableCell>
 
                       <TableCell>
-                        {log.kategori.tipe === "RUTIN"
-                          ? getStatusBadge(log.status)
-                          : "-"}
+                        <div className="flex flex-wrap gap-1">
+                          {/* Badge Kehadiran */}
+                          <Badge
+                            variant={
+                              log.statusKehadiran === "HADIR"
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {log.statusKehadiran}
+                          </Badge>
+
+                          {/* Badge Status Waktu (Hanya jika Hadir & Sesi Rutin) */}
+                          {log.statusWaktu === "TELAT" && log.sesi && (
+                            <Badge variant="destructive">TELAT</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-right font-mono">
+                        <div
+                          className={`font-bold ${log.poinDidapat > 0 ? "text-green-600" : log.poinDidapat < 0 ? "text-red-600" : "text-gray-500"}`}
+                        >
+                          {log.poinDidapat > 0
+                            ? `+${log.poinDidapat}`
+                            : log.poinDidapat}
+                        </div>
+                        {log.isPoinManual && (
+                          <div className="text-[10px] text-orange-500 italic">
+                            Diedit Manual
+                          </div>
+                        )}
                       </TableCell>
 
                       <TableCell
-                        className={`text-right font-bold ${log.poinDidapat > 0 ? "text-green-600" : log.poinDidapat < 0 ? "text-red-600" : ""}`}
-                      >
-                        {log.poinDidapat > 0
-                          ? `+${log.poinDidapat}`
-                          : log.poinDidapat}
-                      </TableCell>
-
-                      <TableCell
-                        className="max-w-[200px] truncate"
+                        className="max-w-[150px] truncate"
                         title={log.keterangan || "-"}
                       >
-                        {log.keterangan || "-"}
+                        {log.keterangan || (
+                          <span className="text-muted-foreground italic">
+                            -
+                          </span>
+                        )}
                       </TableCell>
 
                       <TableCell className="text-sm">
-                        {log.waliAsuh?.name || "-"}
+                        {log.waliAsuh?.name || "Sistem"}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+
+                  {logs?.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-muted-foreground py-8 text-center"
+                      >
+                        Belum ada aktivitas yang dicatat.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Render Komponen Dialog Modal */}
-      <ManualLogFormDialog
-        isOpen={isManualModalOpen}
-        onClose={() => setIsManualModalOpen(false)}
-      />
     </div>
   );
 }

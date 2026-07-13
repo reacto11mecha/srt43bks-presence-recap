@@ -1,225 +1,104 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "~/trpc/react";
-import { toast } from "sonner";
+import { Button, buttonVariants } from "~/components/ui/button"; // <-- Import buttonVariants
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "~/components/ui/dialog";
-import {
-  Field,
-  FieldLabel,
-  FieldError,
-  FieldContent,
-} from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import { Button } from "~/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+import { toast } from "sonner";
+import { Plus, Edit } from "lucide-react";
 
-const kategoriSchema = z.object({
-  namaKategori: z.string().min(1, "Wajib diisi"),
-  tipe: z.enum(["RUTIN", "PELANGGARAN"]),
-  tingkatPelanggaran: z.enum(["TIDAK_ADA", "RINGAN", "SEDANG", "BERAT"]),
-  poinDefault: z.coerce.number(),
+const formSchema = z.object({
+  namaKategori: z.string().min(1, "Nama wajib diisi"),
+  isActive: z.boolean().default(true),
 });
 
-type KategoriFormValues = z.infer<typeof kategoriSchema>;
-
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  initialData?: (KategoriFormValues & { id: string }) | null;
-}
-
-export function KategoriFormDialog({ isOpen, onClose, initialData }: Props) {
+export function KategoriFormDialog({ initialData }: { initialData?: any }) {
+  const [open, setOpen] = useState(false);
   const utils = api.useUtils();
 
-  const form = useForm<KategoriFormValues>({
-    resolver: zodResolver(kategoriSchema),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      namaKategori: "",
-      tipe: "RUTIN",
-      tingkatPelanggaran: "TIDAK_ADA",
-      poinDefault: 0,
+      namaKategori: initialData?.namaKategori || "",
+      isActive: initialData?.isActive ?? true,
     },
   });
 
-  useEffect(() => {
-    if (initialData) {
-      form.reset(initialData);
-    } else {
-      form.reset({
-        namaKategori: "",
-        tipe: "RUTIN",
-        tingkatPelanggaran: "TIDAK_ADA",
-        poinDefault: 0,
-      });
-    }
-  }, [initialData, form, isOpen]);
-
-  const createMutation = api.pengaturan.createKategori.useMutation({
+  const mutation = api.pengaturan[
+    initialData ? "updateKategori" : "createKategori"
+  ].useMutation({
     onSuccess: () => {
-      toast.success("Kategori berhasil ditambahkan");
+      toast.success(
+        `Kategori berhasil ${initialData ? "diperbarui" : "dibuat"}`,
+      );
       utils.pengaturan.getKategoriWithSesi.invalidate();
-      onClose();
+      setOpen(false);
+      if (!initialData) form.reset();
     },
   });
-
-  const updateMutation = api.pengaturan.updateKategori.useMutation({
-    onSuccess: () => {
-      toast.success("Kategori berhasil diperbarui");
-      utils.pengaturan.getKategoriWithSesi.invalidate();
-      onClose();
-    },
-  });
-
-  const onSubmit = (data: KategoriFormValues) => {
-    if (initialData?.id) {
-      updateMutation.mutate({ id: initialData.id, ...data });
-    } else {
-      createMutation.mutate(data);
-    }
-  };
-
-  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {/* MENGGUNAKAN BUTTON VARIANTS PADA TRIGGER */}
+      <DialogTrigger
+        className={
+          initialData
+            ? buttonVariants({ variant: "outline", size: "sm" })
+            : buttonVariants({})
+        }
+      >
+        {initialData ? (
+          <>
+            <Edit className="mr-2 h-4 w-4" /> Edit Kategori
+          </>
+        ) : (
+          <>
+            <Plus className="mr-2 h-4 w-4" /> Tambah Kategori Baru
+          </>
+        )}
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {initialData ? "Edit Kategori" : "Tambah Kategori"}
+            {initialData ? "Edit Kategori" : "Kategori Baru"}
           </DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <Controller
-            name="namaKategori"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>Nama Kategori</FieldLabel>
-                <Input
-                  {...field}
-                  id={field.name}
-                  aria-invalid={fieldState.invalid}
-                  placeholder="Contoh: Shalat Subuh"
-                  autoComplete="off"
-                />
-                {fieldState.invalid && (
-                  <FieldError errors={[fieldState.error]} />
-                )}
-              </Field>
-            )}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Controller
-              name="tipe"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldContent>
-                    <FieldLabel htmlFor={`select-${field.name}`}>
-                      Tipe
-                    </FieldLabel>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </FieldContent>
-                  <Select
-                    name={field.name}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      id={`select-${field.name}`}
-                      aria-invalid={fieldState.invalid}
-                    >
-                      <SelectValue placeholder="Pilih Tipe" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="RUTIN">Rutin</SelectItem>
-                      <SelectItem value="PELANGGARAN">Pelanggaran</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="tingkatPelanggaran"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldContent>
-                    <FieldLabel htmlFor={`select-${field.name}`}>
-                      Tingkat
-                    </FieldLabel>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </FieldContent>
-                  <Select
-                    name={field.name}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      id={`select-${field.name}`}
-                      aria-invalid={fieldState.invalid}
-                    >
-                      <SelectValue placeholder="Pilih Tingkat" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="TIDAK_ADA">Tidak Ada</SelectItem>
-                      <SelectItem value="RINGAN">Ringan</SelectItem>
-                      <SelectItem value="SEDANG">Sedang</SelectItem>
-                      <SelectItem value="BERAT">Berat</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
+        <form
+          onSubmit={form.handleSubmit((d) =>
+            mutation.mutate(initialData ? { id: initialData.id, ...d } : d),
+          )}
+          className="space-y-4"
+        >
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nama Kategori Induk</label>
+            <Input
+              {...form.register("namaKategori")}
+              placeholder="Contoh: Absen Makan"
             />
           </div>
-
-          <Controller
-            name="poinDefault"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>
-                  Poin Default (Positif/Negatif)
-                </FieldLabel>
-                <Input
-                  {...field}
-                  id={field.name}
-                  type="number"
-                  aria-invalid={fieldState.invalid}
-                  placeholder="Contoh: 25 atau -10"
-                />
-                {fieldState.invalid && (
-                  <FieldError errors={[fieldState.error]} />
-                )}
-              </Field>
-            )}
-          />
-
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                {...form.register("isActive")}
+                className="h-4 w-4"
+              />
+              Kategori Aktif
+            </label>
+          </div>
           <div className="flex justify-end pt-4">
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Menyimpan..." : "Simpan"}
+            <Button type="submit" disabled={mutation.isPending}>
+              Simpan Kategori
             </Button>
           </div>
         </form>

@@ -1,164 +1,205 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "~/trpc/react";
-import { toast } from "sonner";
+import { Button, buttonVariants } from "~/components/ui/button"; // <-- Import buttonVariants
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "~/components/ui/dialog";
-import { Field, FieldLabel, FieldError } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import { Button } from "~/components/ui/button";
+import { toast } from "sonner";
+import { Plus, Edit } from "lucide-react";
 
-const sesiSchema = z.object({
-  namaSesi: z.string().min(1, "Wajib diisi"),
-  waktuMulai: z.string().min(5, "Format HH:MM wajib diisi"),
-  waktuSelesai: z.string().min(5, "Format HH:MM wajib diisi"),
+const formSchema = z.object({
+  namaSesi: z.string().min(1, "Nama sesi wajib diisi"),
+  waktuMulai: z.string(),
+  waktuSelesai: z.string(),
+  isMandatory: z.boolean().default(true),
+  targetJenjang: z
+    .array(z.enum(["SD", "SMP", "SMA"]))
+    .min(1, "Pilih minimal 1 jenjang"),
+  poinTepatWaktu: z.coerce.number(),
+  poinTelat: z.coerce.number(),
+  isActive: z.boolean().default(true),
 });
 
-type SesiFormValues = z.infer<typeof sesiSchema>;
-
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  kategoriId: string;
-  initialData?: (SesiFormValues & { id: string }) | null;
-}
+type FormValues = z.infer<typeof formSchema>;
 
 export function SesiFormDialog({
-  isOpen,
-  onClose,
   kategoriId,
   initialData,
-}: Props) {
+}: {
+  kategoriId: string;
+  initialData?: any;
+}) {
+  const [open, setOpen] = useState(false);
   const utils = api.useUtils();
 
-  const form = useForm<SesiFormValues>({
-    resolver: zodResolver(sesiSchema),
+  const formatTimeForInput = (timeStr?: string) =>
+    timeStr ? timeStr.substring(0, 5) : "";
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      namaSesi: "",
-      waktuMulai: "",
-      waktuSelesai: "",
+      namaSesi: initialData?.namaSesi || "",
+      waktuMulai: formatTimeForInput(initialData?.waktuMulai) || "00:00",
+      waktuSelesai: formatTimeForInput(initialData?.waktuSelesai) || "00:00",
+      isMandatory: initialData?.isMandatory ?? true,
+      targetJenjang: initialData?.targetJenjang || ["SD", "SMP", "SMA"],
+      poinTepatWaktu: initialData?.poinTepatWaktu || 0,
+      poinTelat: initialData?.poinTelat || 0,
+      isActive: initialData?.isActive ?? true,
     },
   });
 
-  useEffect(() => {
-    if (initialData) {
-      form.reset({
-        namaSesi: initialData.namaSesi,
-        waktuMulai: initialData.waktuMulai.substring(0, 5),
-        waktuSelesai: initialData.waktuSelesai.substring(0, 5),
-      });
-    } else {
-      form.reset({ namaSesi: "", waktuMulai: "", waktuSelesai: "" });
-    }
-  }, [initialData, form, isOpen]);
-
-  const createMutation = api.pengaturan.createSesi.useMutation({
+  const mutation = api.pengaturan[
+    initialData ? "updateSesi" : "createSesi"
+  ].useMutation({
     onSuccess: () => {
-      toast.success("Sesi berhasil ditambahkan");
+      toast.success(
+        `Sesi berhasil ${initialData ? "diperbarui" : "ditambahkan"}`,
+      );
       utils.pengaturan.getKategoriWithSesi.invalidate();
-      onClose();
+      setOpen(false);
+      if (!initialData) form.reset();
     },
+    onError: (e) => toast.error(e.message),
   });
-
-  const updateMutation = api.pengaturan.updateSesi.useMutation({
-    onSuccess: () => {
-      toast.success("Sesi berhasil diperbarui");
-      utils.pengaturan.getKategoriWithSesi.invalidate();
-      onClose();
-    },
-  });
-
-  const onSubmit = (data: SesiFormValues) => {
-    if (initialData?.id) {
-      updateMutation.mutate({ id: initialData.id, ...data });
-    } else {
-      createMutation.mutate({ kategoriId, ...data });
-    }
-  };
-
-  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {/* MENGGUNAKAN BUTTON VARIANTS PADA TRIGGER */}
+      <DialogTrigger
+        className={
+          initialData
+            ? buttonVariants({
+                variant: "ghost",
+                size: "sm",
+                className: "h-8 w-8 p-0",
+              })
+            : buttonVariants({ variant: "secondary", size: "sm" })
+        }
+      >
+        {initialData ? (
+          <Edit className="h-4 w-4" />
+        ) : (
+          <>
+            <Plus className="mr-2 h-4 w-4" /> Tambah Sesi
+          </>
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {initialData ? "Edit Sesi Jadwal" : "Tambah Sesi Jadwal"}
+            {initialData ? "Edit Sesi Jadwal" : "Tambah Sesi Baru"}
           </DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <Controller
-            name="namaSesi"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>Nama Sesi</FieldLabel>
-                <Input
-                  {...field}
-                  id={field.name}
-                  aria-invalid={fieldState.invalid}
-                  placeholder="Contoh: Sesi Pagi"
-                  autoComplete="off"
-                />
-                {fieldState.invalid && (
-                  <FieldError errors={[fieldState.error]} />
-                )}
-              </Field>
-            )}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Controller
-              name="waktuMulai"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Waktu Mulai</FieldLabel>
-                  <Input
-                    {...field}
-                    id={field.name}
-                    type="time"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
-
-            <Controller
-              name="waktuSelesai"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Waktu Selesai</FieldLabel>
-                  <Input
-                    {...field}
-                    id={field.name}
-                    type="time"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
+        <form
+          onSubmit={form.handleSubmit((d) =>
+            mutation.mutate(
+              initialData
+                ? { id: initialData.id, ...d, kategoriId }
+                : { ...d, kategoriId },
+            ),
+          )}
+          className="mt-2 space-y-5"
+        >
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nama Sesi</label>
+            <Input
+              {...form.register("namaSesi")}
+              placeholder="Contoh: Apel Pagi"
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Waktu Mulai</label>
+              <Input type="time" {...form.register("waktuMulai")} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Batas Waktu Akhir (Selesai)
+              </label>
+              <Input type="time" {...form.register("waktuSelesai")} />
+            </div>
+          </div>
+
+          <div className="bg-muted/30 space-y-2 rounded-md border p-3">
+            <label className="mb-2 block text-sm font-bold">
+              Target Jenjang Kelas
+            </label>
+            <div className="flex gap-6">
+              {["SD", "SMP", "SMA"].map((jenjang) => (
+                <label
+                  key={jenjang}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    value={jenjang}
+                    {...form.register("targetJenjang")}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  {jenjang}
+                </label>
+              ))}
+            </div>
+            {form.formState.errors.targetJenjang && (
+              <p className="mt-1 text-xs text-red-500">
+                {form.formState.errors.targetJenjang.message}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Poin Tepat Waktu</label>
+              <Input
+                type="number"
+                {...form.register("poinTepatWaktu")}
+                placeholder="10"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Poin Telat / Denda</label>
+              <Input
+                type="number"
+                {...form.register("poinTelat")}
+                placeholder="-5"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                {...form.register("isMandatory")}
+                className="h-4 w-4"
+              />
+              Kegiatan Wajib (Mandatory)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                {...form.register("isActive")}
+                className="h-4 w-4"
+              />
+              Sesi Aktif
+            </label>
+          </div>
+
           <div className="flex justify-end pt-4">
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Menyimpan..." : "Simpan"}
+            <Button type="submit" disabled={mutation.isPending}>
+              Simpan Jadwal
             </Button>
           </div>
         </form>

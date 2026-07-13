@@ -1,45 +1,31 @@
 "use client";
 
-import { useState } from "react";
 import { api } from "~/trpc/react";
-import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "~/components/ui/accordion";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus } from "lucide-react";
-
-// Import komponen form dialog yang sudah dibuat
 import { KategoriFormDialog } from "~/_components/pengaturan/kategori-form-dialog";
 import { SesiFormDialog } from "~/_components/pengaturan/sesi-form-dialog";
+import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form-dialog"; // Komponen baru
 
 export default function PengaturanPage() {
   const utils = api.useUtils();
 
-  // ==========================================
-  // STATE MANAJEMEN MODAL
-  // ==========================================
-  // State untuk Kategori
-  const [isKategoriOpen, setIsKategoriOpen] = useState(false);
-  const [selectedKategori, setSelectedKategori] = useState<any>(null);
-
-  // State untuk Sesi
-  const [isSesiOpen, setIsSesiOpen] = useState(false);
-  const [selectedSesi, setSelectedSesi] = useState<any>(null);
-  const [activeKategoriId, setActiveKategoriId] = useState("");
-
-  // ==========================================
-  // QUERIES & MUTATIONS
-  // ==========================================
   const { data: users, isLoading: loadingUsers } =
     api.pengaturan.getAllUsers.useQuery();
-  const { data: kategoriList, isLoading: loadingKategori } =
+  const { data: kategoriData, isLoading: isLoadingKategori } =
     api.pengaturan.getKategoriWithSesi.useQuery();
+  const { data: pelanggaranData, isLoading: isLoadingPelanggaran } =
+    api.pengaturan.getMasterPelanggaran.useQuery();
 
   const approveUserMutation = api.pengaturan.approveUser.useMutation({
     onSuccess: () => {
@@ -48,41 +34,25 @@ export default function PengaturanPage() {
     },
   });
 
-  const deleteKategori = api.pengaturan.deleteKategori.useMutation({
-    onSuccess: () => {
-      toast.success("Kategori berhasil dihapus");
-      utils.pengaturan.getKategoriWithSesi.invalidate();
-    },
-  });
-
-  const deleteSesi = api.pengaturan.deleteSesi.useMutation({
-    onSuccess: () => {
-      toast.success("Sesi berhasil dihapus");
-      utils.pengaturan.getKategoriWithSesi.invalidate();
-    },
-  });
-
   const unapprovedUsers = users?.filter((u) => !u.accountApproved) || [];
   const approvedUsers = users?.filter((u) => u.accountApproved) || [];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Pengaturan Sistem</h1>
         <p className="text-muted-foreground">
-          Kelola pengguna, kategori absensi, dan jadwal sesi.
+          Kelola kategori absensi, jadwal sesi, dan master pelanggaran.
         </p>
       </div>
 
       <Tabs defaultValue="kategori" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="akun">Akun Pengguna</TabsTrigger>
-          <TabsTrigger value="kategori">Kategori & Jadwal Sesi</TabsTrigger>
+          <TabsTrigger value="akun">Daftar Pengguna</TabsTrigger>
+          <TabsTrigger value="kategori">Kategori & Sesi Rutin</TabsTrigger>
+          <TabsTrigger value="pelanggaran">Master Pelanggaran</TabsTrigger>
         </TabsList>
 
-        {/* ==========================================
-            TAB 1: AKUN PENGGUNA
-            ========================================== */}
         <TabsContent value="akun" className="space-y-6">
           <div className="rounded-md border border-yellow-200 bg-yellow-50/50 p-4 dark:bg-yellow-950/10">
             <h2 className="mb-4 text-xl font-semibold text-yellow-800 dark:text-yellow-500">
@@ -150,187 +120,176 @@ export default function PengaturanPage() {
           </div>
         </TabsContent>
 
-        {/* ==========================================
-            TAB 2: KATEGORI & SESI
-            ========================================== */}
-        <TabsContent value="kategori" className="space-y-4">
+        {/* TAB 1: KATEGORI & SESI */}
+        <TabsContent value="kategori" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Manajemen Kategori & Sesi</h2>
-            {/* TOMBOL TAMBAH KATEGORI */}
-            <Button
-              size="sm"
-              onClick={() => {
-                setSelectedKategori(null);
-                setIsKategoriOpen(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Tambah Kategori
-            </Button>
+            <h2 className="text-xl font-semibold">Daftar Kategori Absensi</h2>
+            <KategoriFormDialog />
           </div>
 
-          {loadingKategori ? (
-            <p className="text-sm">Memuat data...</p>
+          {isLoadingKategori ? (
+            <p className="text-muted-foreground text-sm">Memuat data...</p>
           ) : (
-            <Accordion type="multiple" className="w-full space-y-4">
-              {kategoriList?.map((kategori) => (
-                <AccordionItem
+            <div className="grid gap-6">
+              {kategoriData?.map((kategori) => (
+                <div
                   key={kategori.id}
-                  value={kategori.id}
-                  className="bg-card rounded-lg border px-4"
+                  className="bg-card rounded-lg border p-4"
                 >
-                  <div className="flex items-center justify-between">
-                    <AccordionTrigger className="flex-1 text-left hover:no-underline">
-                      <div className="flex flex-col">
-                        <span className="text-base font-semibold">
-                          {kategori.namaKategori}
-                        </span>
-                        <div className="mt-1 flex gap-2">
-                          <Badge variant="secondary">{kategori.tipe}</Badge>
-                          <Badge
-                            variant={
-                              kategori.poinDefault > 0
-                                ? "default"
-                                : "destructive"
-                            }
-                          >
-                            {kategori.poinDefault} Poin
-                          </Badge>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-
-                    <div className="ml-4 flex items-center gap-2">
-                      {/* TOMBOL EDIT KATEGORI */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedKategori(kategori);
-                          setIsKategoriOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      {/* TOMBOL HAPUS KATEGORI */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hover:text-red-500"
-                        onClick={() => {
-                          if (
-                            confirm(
-                              "Yakin ingin menghapus kategori ini? Semua sesi dan log absensi terkait bisa terhapus.",
-                            )
-                          ) {
-                            deleteKategori.mutate({ id: kategori.id });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div className="mb-4 flex items-center justify-between border-b pb-4">
+                    <div>
+                      <h3 className="flex items-center gap-2 text-lg font-bold">
+                        {kategori.namaKategori}
+                        {!kategori.isActive && (
+                          <Badge variant="destructive">Nonaktif</Badge>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="flex gap-2">
+                      <SesiFormDialog kategoriId={kategori.id} />
+                      <KategoriFormDialog initialData={kategori} />
                     </div>
                   </div>
 
-                  <AccordionContent className="pt-2 pb-4">
-                    <div className="mt-2 ml-2 space-y-3 border-l-2 pl-4">
-                      <div className="mb-2 flex items-center justify-between">
-                        <h4 className="text-muted-foreground text-sm font-medium">
-                          Jadwal Sesi
-                        </h4>
-
-                        {/* TOMBOL TAMBAH SESI (Hanya untuk kategori RUTIN) */}
-                        {kategori.tipe === "RUTIN" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              setActiveKategoriId(kategori.id);
-                              setSelectedSesi(null);
-                              setIsSesiOpen(true);
-                            }}
-                          >
-                            <Plus className="mr-1 h-3 w-3" /> Tambah Sesi
-                          </Button>
-                        )}
-                      </div>
-
-                      {kategori.sesi.length === 0 ? (
-                        <p className="text-muted-foreground text-xs italic">
-                          Tidak ada sesi jadwal.
-                        </p>
-                      ) : (
-                        kategori.sesi.map((sesi) => (
-                          <div
-                            key={sesi.id}
-                            className="bg-muted/30 flex items-center justify-between rounded-md border p-2 text-sm"
-                          >
-                            <div>
-                              <span className="font-medium">
-                                {sesi.namaSesi}
-                              </span>
-                              <span className="text-muted-foreground ml-2">
-                                ({sesi.waktuMulai} - {sesi.waktuSelesai})
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              {/* TOMBOL EDIT SESI */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => {
-                                  setActiveKategoriId(kategori.id);
-                                  setSelectedSesi(sesi);
-                                  setIsSesiOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              {/* TOMBOL HAPUS SESI */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:text-red-500"
-                                onClick={() => {
-                                  if (
-                                    confirm("Yakin ingin menghapus sesi ini?")
-                                  ) {
-                                    deleteSesi.mutate({ id: sesi.id });
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
+                  {kategori.sesi.length === 0 ? (
+                    <p className="text-muted-foreground text-sm italic">
+                      Belum ada sesi di kategori ini.
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nama Sesi</TableHead>
+                          <TableHead>Waktu</TableHead>
+                          <TableHead>Kewajiban</TableHead>
+                          <TableHead>Target Jenjang</TableHead>
+                          <TableHead>Poin (Tepat / Telat)</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {kategori.sesi.map((sesi) => (
+                          <TableRow key={sesi.id}>
+                            <TableCell className="font-medium">
+                              {sesi.namaSesi}{" "}
+                              {!sesi.isActive && (
+                                <Badge variant="outline">Nonaktif</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {sesi.waktuMulai} - {sesi.waktuSelesai}
+                            </TableCell>
+                            <TableCell>
+                              {sesi.isMandatory ? (
+                                <Badge>Wajib</Badge>
+                              ) : (
+                                <Badge variant="secondary">Opsional</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {sesi.targetJenjang.join(", ")}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              +{sesi.poinTepatWaktu} / {sesi.poinTelat}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <SesiFormDialog
+                                kategoriId={kategori.id}
+                                initialData={sesi}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
               ))}
-            </Accordion>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 2: MASTER PELANGGARAN */}
+        <TabsContent value="pelanggaran" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Master Pelanggaran</h2>
+              <p className="text-muted-foreground text-sm">
+                Atur bobot poin untuk setiap tingkat pelanggaran.
+              </p>
+            </div>
+            <PelanggaranFormDialog />
+          </div>
+
+          {isLoadingPelanggaran ? (
+            <p className="text-muted-foreground text-sm">Memuat data...</p>
+          ) : (
+            <div className="bg-card rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Kategori Pelanggaran</TableHead>
+                    <TableHead>Tingkat</TableHead>
+                    <TableHead>Poin Minus</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pelanggaranData?.map((pelanggaran) => (
+                    <TableRow key={pelanggaran.id}>
+                      <TableCell className="font-medium">
+                        {pelanggaran.namaPelanggaran}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            pelanggaran.tingkat === "BERAT"
+                              ? "destructive"
+                              : pelanggaran.tingkat === "SEDANG"
+                                ? "default"
+                                : "secondary"
+                          }
+                        >
+                          {pelanggaran.tingkat}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono font-bold text-red-500">
+                        {pelanggaran.poinMinus}
+                      </TableCell>
+                      <TableCell>
+                        {pelanggaran.isActive ? (
+                          <Badge
+                            variant="outline"
+                            className="border-green-600 text-green-600"
+                          >
+                            Aktif
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Nonaktif</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <PelanggaranFormDialog initialData={pelanggaran} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {pelanggaranData?.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="text-muted-foreground py-8 text-center"
+                      >
+                        Belum ada data pelanggaran.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </TabsContent>
       </Tabs>
-
-      {/* ==========================================
-          RENDER KOMPONEN MODAL
-          ========================================== */}
-      <KategoriFormDialog
-        isOpen={isKategoriOpen}
-        onClose={() => setIsKategoriOpen(false)}
-        initialData={selectedKategori}
-      />
-
-      <SesiFormDialog
-        isOpen={isSesiOpen}
-        onClose={() => setIsSesiOpen(false)}
-        kategoriId={activeKategoriId}
-        initialData={selectedSesi}
-      />
     </div>
   );
 }
