@@ -326,7 +326,8 @@ export function PesertaTableActions() {
   return (
     <div className="flex flex-col items-start gap-2">
       <div className="text-muted-foreground hidden text-sm sm:block">
-        Gunakan template Excel untuk memastikan struktur kolom sesuai.
+        Gunakan template Excel untuk memastikan struktur kolom sesuai untuk{" "}
+        <i>bulk upload</i>.
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">

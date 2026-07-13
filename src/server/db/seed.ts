@@ -15,7 +15,7 @@ async function main() {
       namaKategori: string,
       tipe: "RUTIN" | "PELANGGARAN",
       tingkatPelanggaran: "TIDAK_ADA" | "RINGAN" | "SEDANG" | "BERAT",
-      poinDefault: number
+      poinDefault: number,
     ) => ({
       id: crypto.randomUUID(),
       namaKategori,
@@ -37,22 +37,55 @@ async function main() {
     const makanSiang = createKategori("Makan Siang", "RUTIN", "TIDAK_ADA", 30);
     const makanMalam = createKategori("Makan Malam", "RUTIN", "TIDAK_ADA", 30);
 
-    const istirahatTepat = createKategori("Istirahat Malam (Tepat Waktu)", "RUTIN", "TIDAK_ADA", 85);
+    const istirahatTepat = createKategori(
+      "Istirahat Malam (Tepat Waktu)",
+      "RUTIN",
+      "TIDAK_ADA",
+      85,
+    );
 
     // Master Data Pelanggaran
-    const istirahatTelat = createKategori("Istirahat Malam (Tidak Tepat Waktu)", "PELANGGARAN", "RINGAN", -50);
-    const kataKasar = createKategori("Berkata Kasar", "PELANGGARAN", "RINGAN", -10);
-    const rusakFasilitas = createKategori("Merusak Fasilitas", "PELANGGARAN", "SEDANG", -30);
+    const istirahatTelat = createKategori(
+      "Istirahat Malam (Tidak Tepat Waktu)",
+      "PELANGGARAN",
+      "RINGAN",
+      -50,
+    );
+    const kataKasar = createKategori(
+      "Berkata Kasar",
+      "PELANGGARAN",
+      "RINGAN",
+      -10,
+    );
+    const rusakFasilitas = createKategori(
+      "Merusak Fasilitas",
+      "PELANGGARAN",
+      "SEDANG",
+      -30,
+    );
     const pacaran = createKategori("Pacaran", "PELANGGARAN", "BERAT", -100);
 
     const semuaKategori = [
-      subuh, dhuha, zuhur, ashar, maghrib, isya,
-      makanPagi, makanSiang, makanMalam,
-      istirahatTepat, istirahatTelat,
-      kataKasar, rusakFasilitas, pacaran
+      subuh,
+      dhuha,
+      zuhur,
+      ashar,
+      maghrib,
+      isya,
+      makanPagi,
+      makanSiang,
+      makanMalam,
+      istirahatTepat,
+      istirahatTelat,
+      kataKasar,
+      rusakFasilitas,
+      pacaran,
     ];
 
-    await db.insert(kategoriAbsensi).values(semuaKategori).onConflictDoNothing();
+    await db
+      .insert(kategoriAbsensi)
+      .values(semuaKategori)
+      .onConflictDoNothing();
     console.log("✅ Data Kategori Absensi berhasil dimasukkan.");
 
     // ==========================================
@@ -127,7 +160,7 @@ async function main() {
     await db.insert(sesiAbsensi).values(dataSesi).onConflictDoNothing();
     console.log("✅ Data Sesi Absensi berhasil dimasukkan.");
     console.log("🎉 Seeding selesai!");
-    process.exit()
+    process.exit();
   } catch (error) {
     console.error("❌ Terjadi kesalahan saat seeding:", error);
   }

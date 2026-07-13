@@ -1,4 +1,6 @@
 import { pesertaRouter } from "~/server/api/routers/peserta";
+import { pengaturanRouter } from "~/server/api/routers/pengaturan";
+import { aktivitasRouter } from "~/server/api/routers/aktivitas";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
@@ -8,6 +10,8 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   peserta: pesertaRouter,
+  pengaturan: pengaturanRouter,
+  aktivitas: aktivitasRouter,
 });
 
 // export type definition of API

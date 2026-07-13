@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileText, Settings } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Settings, ScrollText } from "lucide-react";
 import { cn } from "~/lib/utils";
 
 export function Sidebar() {
@@ -11,9 +11,15 @@ export function Sidebar() {
   // Daftar menu agar mudah dikelola dan ditambah di masa depan
   const menus = [
     { name: "Ringkasan", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
+
+    { name: "Aktivitas Absensi", href: "/dashboard/aktivitas", icon: ScrollText },
     { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
-    { name: "Pengaturan Sistem", href: "/dashboard/sistem", icon: Settings },
+    { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
+    {
+      name: "Pengaturan Sistem",
+      href: "/dashboard/pengaturan",
+      icon: Settings,
+    },
   ];
 
   return (
@@ -31,7 +37,6 @@ export function Sidebar() {
         <nav className="grid items-start gap-1 px-2 text-sm font-medium lg:px-4">
           {menus.map((menu) => {
             const Icon = menu.icon;
-            // Mengecek apakah menu sedang aktif untuk memberikan warna *highlight*
             const isActive = pathname === menu.href;
 
             return (
