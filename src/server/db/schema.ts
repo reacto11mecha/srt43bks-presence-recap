@@ -35,6 +35,15 @@ export const statusPesertaEnum = pgEnum("status_peserta", [
   "PINDAH",
   "KELUAR",
 ]);
+export const agamaEnum = pgEnum("agama", [
+  "ISLAM",
+  "KRISTEN",
+  "KATOLIK",
+  "HINDU",
+  "BUDHA",
+  "KONGHUCU",
+  "LAINNYA",
+]);
 
 // ==========================================
 // BETTER AUTH TABLES
@@ -134,6 +143,19 @@ export const sesiAbsensi = pgTable("sesi_absensi", {
 
   isMandatory: boolean("is_mandatory").default(true).notNull(),
 
+  targetAgama: agamaEnum("target_agama")
+    .array()
+    .default([
+      "ISLAM",
+      "KRISTEN",
+      "KATOLIK",
+      "HINDU",
+      "BUDHA",
+      "KONGHUCU",
+      "LAINNYA",
+    ])
+    .notNull(),
+
   targetJenjang: jenjangEnum("target_jenjang").array().notNull(),
 
   poinTepatWaktu: integer("poin_tepat_waktu").notNull(),
@@ -188,7 +210,7 @@ export const pesertaDidik = pgTable("peserta_didik", {
   noAkte: text("no_akte"),
   nik: text("nik"),
   noKk: text("no_kk"),
-  agama: text("agama"),
+  agama: agamaEnum("agama").default("ISLAM").notNull(),
   alamat: text("alamat"),
   rt: text("rt"),
   rw: text("rw"),

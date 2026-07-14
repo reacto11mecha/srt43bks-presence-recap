@@ -162,10 +162,21 @@ export const aktivitasRouter = createTRPCRouter({
       if (!sesi) throw new Error("Sesi jadwal tidak valid.");
 
       // 3. Validasi Target Jenjang Sesi
-      const isTargeted = sesi.targetJenjang.includes(peserta.kelas.jenjang);
-      if (!isTargeted) {
+      const isTargetedJenjang = sesi.targetJenjang.includes(
+        peserta.kelas.jenjang,
+      );
+      if (!isTargetedJenjang) {
         throw new Error(
-          `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan untuk absen pada sesi ini.`,
+          `Siswa jenjang ${peserta.kelas.jenjang} tidak ditugaskan untuk sesi ini.`,
+        );
+      }
+
+      // TAMBAHAN BARU: Validasi Agama Peserta
+      // Memastikan anak Non-Is tidak bisa absen di kegiatan Islam, dan sebaliknya
+      const isTargetedAgama = sesi.targetAgama.includes(peserta.agama as any);
+      if (!isTargetedAgama) {
+        throw new Error(
+          `Sesi ini tidak diperuntukkan bagi peserta didik beragama ${peserta.agama}.`,
         );
       }
 
