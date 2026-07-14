@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn(geist.variable, "font-sans", inter.variable)}>
       <body>
-        <Toaster />
+        <Toaster richColors />
         <TRPCReactProvider>{children}</TRPCReactProvider>
       </body>
     </html>
