@@ -120,6 +120,19 @@ export const pengaturanRouter = createTRPCRouter({
         targetJenjang: z
           .array(z.enum(["SD", "SMP", "SMA"]))
           .min(1, "Pilih minimal 1 jenjang"),
+        targetAgama: z
+          .array(
+            z.enum([
+              "ISLAM",
+              "KRISTEN",
+              "KATOLIK",
+              "HINDU",
+              "BUDHA",
+              "KONGHUCU",
+              "LAINNYA",
+            ]),
+          )
+          .min(1, "Pilih minimal 1 agama"),
         poinTepatWaktu: z.number(),
         poinTelat: z.number(),
         isActive: z.boolean().default(true),
@@ -133,6 +146,7 @@ export const pengaturanRouter = createTRPCRouter({
         waktuSelesai: formatTime(input.waktuSelesai),
         isMandatory: input.isMandatory,
         targetJenjang: input.targetJenjang,
+        targetAgama: input.targetAgama,
         poinTepatWaktu: input.poinTepatWaktu,
         poinTelat: input.poinTelat,
         isActive: input.isActive,
@@ -150,6 +164,19 @@ export const pengaturanRouter = createTRPCRouter({
         targetJenjang: z
           .array(z.enum(["SD", "SMP", "SMA"]))
           .min(1, "Pilih minimal 1 jenjang"),
+        targetAgama: z
+          .array(
+            z.enum([
+              "ISLAM",
+              "KRISTEN",
+              "KATOLIK",
+              "HINDU",
+              "BUDHA",
+              "KONGHUCU",
+              "LAINNYA",
+            ]),
+          )
+          .min(1, "Pilih minimal 1 agama"),
         poinTepatWaktu: z.number(),
         poinTelat: z.number(),
         isActive: z.boolean(),
@@ -164,6 +191,7 @@ export const pengaturanRouter = createTRPCRouter({
           waktuSelesai: formatTime(input.waktuSelesai),
           isMandatory: input.isMandatory,
           targetJenjang: input.targetJenjang,
+          targetAgama: input.targetAgama,
           poinTepatWaktu: input.poinTepatWaktu,
           poinTelat: input.poinTelat,
           isActive: input.isActive,

@@ -50,7 +50,6 @@ const formSchema = z
     kategoriId: z.string().optional(),
     sesiId: z.string().optional(),
     pelanggaranId: z.string().optional(),
-    // Hapus .default() untuk menghindari konflik tipe undefined
     statusKehadiran: z.enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA"]),
     keterangan: z.string().optional(),
     tanggal: z.string().min(1, "Tanggal wajib diisi"),
@@ -156,6 +155,12 @@ export function ManualLogFormDialog() {
     });
   };
 
+  // Helper untuk menampilkan waktu sesi dengan aman
+  const formatSessionTime = (time?: string | null) => {
+    if (!time) return "";
+    return ` (${time.substring(0, 5)})`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className={buttonVariants()}>
@@ -199,7 +204,7 @@ export function ManualLogFormDialog() {
                     >
                       <SelectValue placeholder="Pilih Siswa (Bisa dicari...)">
                         {selectedPeserta
-                          ? `${selectedPeserta.namaLengkap} (${selectedPeserta.kelas.jenjang} ${selectedPeserta.kelas.tingkat} ${selectedPeserta.kelas.namaKelas})`
+                          ? `${selectedPeserta.namaLengkap} (${selectedPeserta.kelas.tingkat} ${selectedPeserta.kelas.namaKelas})`
                           : undefined}
                       </SelectValue>
                     </SelectTrigger>
@@ -223,7 +228,7 @@ export function ManualLogFormDialog() {
                             value={p.id}
                             className="cursor-pointer py-3"
                           >
-                            {p.namaLengkap} ({p.kelas.jenjang} {p.kelas.tingkat}{" "}
+                            {p.namaLengkap} ({p.kelas.tingkat}{" "}
                             {p.kelas.namaKelas})
                           </SelectItem>
                         ))
@@ -359,15 +364,15 @@ export function ManualLogFormDialog() {
                               >
                                 <SelectValue placeholder="Pilih Sesi">
                                   {selectedSesi
-                                    ? `${selectedSesi.namaSesi} (${selectedSesi.waktuMulai.substring(0, 5)})`
+                                    ? `${selectedSesi.namaSesi}${formatSessionTime(selectedSesi.waktuMulai)}`
                                     : undefined}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {filteredSesi.map((s) => (
                                   <SelectItem key={s.id} value={s.id}>
-                                    {s.namaSesi} ({s.waktuMulai.substring(0, 5)}
-                                    )
+                                    {s.namaSesi}
+                                    {formatSessionTime(s.waktuMulai)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

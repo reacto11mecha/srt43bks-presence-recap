@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { auth } from "~/server/better-auth";
 import { getSession } from "~/server/better-auth/server";
 import { headers } from "next/headers";
@@ -103,4 +104,11 @@ export async function getCurrentUser() {
     name: session.user.name,
     email: session.user.email,
   };
+}
+
+export async function logoutAction() {
+  await auth.api.signOut({
+    headers: await headers(),
+  });
+  redirect("/login");
 }

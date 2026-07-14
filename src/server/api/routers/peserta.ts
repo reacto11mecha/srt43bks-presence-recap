@@ -1,7 +1,19 @@
+// src/server/api/routers/peserta.ts
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { eq, desc, asc } from "drizzle-orm";
 import { pesertaDidik, kelas, user } from "~/server/db/schema";
 import { z } from "zod";
+
+// Zod enum untuk agama, sesuai dengan database
+const agamaEnumZod = z.enum([
+  "ISLAM",
+  "KRISTEN",
+  "KATOLIK",
+  "HINDU",
+  "BUDHA",
+  "KONGHUCU",
+  "LAINNYA",
+]);
 
 const insertPesertaSchema = z.object({
   nipd: z.string().min(1, "NIPD wajib diisi"),
@@ -12,7 +24,7 @@ const insertPesertaSchema = z.object({
   jenisKelamin: z.string().optional(),
   tempatLahir: z.string().optional(),
   tanggalLahir: z.string().optional(),
-  agama: z.string().optional(),
+  agama: agamaEnumZod.optional(),
   anakKe: z.string().optional(),
   sekolahAsal: z.string().optional(),
   noAkte: z.string().optional(),
@@ -142,14 +154,13 @@ export const pesertaRouter = createTRPCRouter({
   updatePeserta: protectedProcedure
     .input(
       insertPesertaSchema.extend({
-        id: z.string(), // ID wajib dikirim untuk update
+        id: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Pastikan NIPD baru tidak bertabrakan dengan peserta LAIN
       const existing = await ctx.db.query.pesertaDidik.findFirst({
         where: (pd, { and, eq, ne }) =>
-          and(eq(pd.nipd, input.nipd), ne(pd.id, input.id)), // Cari NIPD yang sama, TAPI bukan milik anak ini sendiri
+          and(eq(pd.nipd, input.nipd), ne(pd.id, input.id)),
       });
 
       if (existing)
@@ -172,7 +183,7 @@ export const pesertaRouter = createTRPCRouter({
           jenisKelamin: parseEmptyString(input.jenisKelamin),
           tempatLahir: parseEmptyString(input.tempatLahir),
           tanggalLahir: parseDate(input.tanggalLahir),
-          agama: parseEmptyString(input.agama),
+          agama: input.agama,
           anakKe: parseEmptyString(input.anakKe),
           sekolahAsal: parseEmptyString(input.sekolahAsal),
           noAkte: parseEmptyString(input.noAkte),

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "~/trpc/react";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -14,10 +14,19 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "~/components/ui/field";
 import { toast } from "sonner";
 import { Plus, Edit } from "lucide-react";
 
-// Hapus .default() pada isMandatory dan isActive agar tipe input/output konsisten
 const formSchema = z.object({
   namaSesi: z.string().min(1, "Nama sesi wajib diisi"),
   waktuMulai: z.string().optional(),
@@ -26,12 +35,36 @@ const formSchema = z.object({
   targetJenjang: z
     .array(z.enum(["SD", "SMP", "SMA"]))
     .min(1, "Pilih minimal 1 jenjang"),
+  targetAgama: z
+    .array(
+      z.enum([
+        "ISLAM",
+        "KRISTEN",
+        "KATOLIK",
+        "HINDU",
+        "BUDHA",
+        "KONGHUCU",
+        "LAINNYA",
+      ]),
+    )
+    .min(1, "Pilih minimal 1 agama"),
   poinTepatWaktu: z.coerce.number(),
   poinTelat: z.coerce.number(),
   isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const JENJANG_OPTIONS = ["SD", "SMP", "SMA"] as const;
+const AGAMA_OPTIONS = [
+  "ISLAM",
+  "KRISTEN",
+  "KATOLIK",
+  "HINDU",
+  "BUDHA",
+  "KONGHUCU",
+  "LAINNYA",
+] as const;
 
 export function SesiFormDialog({
   kategoriId,
@@ -54,6 +87,9 @@ export function SesiFormDialog({
       waktuSelesai: formatTimeForInput(initialData?.waktuSelesai) || "",
       isMandatory: initialData?.isMandatory ?? true,
       targetJenjang: initialData?.targetJenjang || ["SD", "SMP", "SMA"],
+      targetAgama: initialData?.targetAgama
+        ? initialData.targetAgama.map((a: string) => a.toUpperCase())
+        : [...AGAMA_OPTIONS],
       poinTepatWaktu: initialData?.poinTepatWaktu || 0,
       poinTelat: initialData?.poinTelat || 0,
       isActive: initialData?.isActive ?? true,
@@ -81,15 +117,9 @@ export function SesiFormDialog({
 
   const onSubmit = (data: FormValues) => {
     if (initialData) {
-      updateMutation.mutate({
-        id: initialData.id,
-        ...data,
-      });
+      updateMutation.mutate({ id: initialData.id, ...data });
     } else {
-      createMutation.mutate({
-        kategoriId: kategoriId,
-        ...data,
-      });
+      createMutation.mutate({ kategoriId, ...data });
     }
   };
 
@@ -123,98 +153,263 @@ export function SesiFormDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-2 space-y-5">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Nama Sesi</label>
-            <Input
-              {...form.register("namaSesi")}
-              placeholder="Contoh: Apel Pagi"
+        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-6">
+          {/* Nama Sesi */}
+          <Controller
+            name="namaSesi"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name}>Nama Sesi</FieldLabel>
+                <Input
+                  id={field.name}
+                  {...field}
+                  placeholder="Contoh: Apel Pagi"
+                  aria-invalid={fieldState.invalid}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          {/* Waktu Mulai & Selesai */}
+          <div className="grid grid-cols-2 gap-4">
+            <Controller
+              name="waktuMulai"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Waktu Mulai</FieldLabel>
+                  <Input
+                    id={field.name}
+                    type="time"
+                    {...field}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldDescription>Kosongkan jika fleksibel</FieldDescription>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+            <Controller
+              name="waktuSelesai"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Batas Akhir</FieldLabel>
+                  <Input
+                    id={field.name}
+                    type="time"
+                    {...field}
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldDescription>Kosongkan jika fleksibel</FieldDescription>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Waktu Mulai</label>
-              <Input type="time" {...form.register("waktuMulai")} />
-              <p className="text-muted-foreground text-[10px]">
-                Kosongkan jika waktu fleksibel
-              </p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Batas Akhir (Selesai)
-              </label>
-              <Input type="time" {...form.register("waktuSelesai")} />
-              <p className="text-muted-foreground text-[10px]">
-                Kosongkan jika waktu fleksibel
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-muted/30 space-y-2 rounded-md border p-3">
-            <label className="mb-2 block text-sm font-bold">
-              Target Jenjang Kelas
-            </label>
-            <div className="flex gap-6">
-              {["SD", "SMP", "SMA"].map((jenjang) => (
-                <label
-                  key={jenjang}
-                  className="flex cursor-pointer items-center gap-2 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    value={jenjang}
-                    {...form.register("targetJenjang")}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                  {jenjang}
-                </label>
-              ))}
-            </div>
-            {form.formState.errors.targetJenjang && (
-              <p className="mt-1 text-xs text-red-500">
-                {form.formState.errors.targetJenjang.message}
-              </p>
+          {/* Target Jenjang */}
+          <Controller
+            name="targetJenjang"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <FieldSet>
+                <FieldLegend>Target Jenjang Kelas</FieldLegend>
+                <FieldGroup className="flex flex-wrap gap-4">
+                  {JENJANG_OPTIONS.map((jenjang) => {
+                    const checked = field.value.includes(jenjang);
+                    return (
+                      <Field
+                        key={jenjang}
+                        orientation="horizontal"
+                        className="items-center gap-2"
+                      >
+                        <input
+                          type="checkbox"
+                          id={`jenjang-${jenjang}`}
+                          checked={checked}
+                          onChange={(e) => {
+                            const newValue = e.target.checked
+                              ? [...field.value, jenjang]
+                              : field.value.filter((v) => v !== jenjang);
+                            field.onChange(newValue);
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        <FieldLabel
+                          htmlFor={`jenjang-${jenjang}`}
+                          className="font-normal"
+                        >
+                          {jenjang}
+                        </FieldLabel>
+                      </Field>
+                    );
+                  })}
+                </FieldGroup>
+                {fieldState.invalid && (
+                  <p className="mt-1 text-sm text-red-500">
+                    {fieldState.error?.message}
+                  </p>
+                )}
+              </FieldSet>
             )}
-          </div>
+          />
 
+          {/* Target Agama */}
+          <Controller
+            name="targetAgama"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <FieldSet>
+                <FieldLegend>Berlaku untuk Agama</FieldLegend>
+                <FieldGroup className="flex flex-wrap gap-4">
+                  {AGAMA_OPTIONS.map((agama) => {
+                    const checked = field.value.includes(agama);
+                    return (
+                      <Field
+                        key={agama}
+                        orientation="horizontal"
+                        className="items-center gap-2"
+                      >
+                        <input
+                          type="checkbox"
+                          id={`agama-${agama}`}
+                          value={agama}
+                          checked={checked}
+                          onChange={(e) => {
+                            const newValue = e.target.checked
+                              ? [...field.value, agama]
+                              : field.value.filter((v) => v !== agama);
+                            field.onChange(newValue);
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                          aria-invalid={fieldState.invalid}
+                        />
+                        <FieldLabel
+                          htmlFor={`agama-${agama}`}
+                          className="font-normal"
+                        >
+                          {agama.charAt(0) + agama.slice(1).toLowerCase()}
+                        </FieldLabel>
+                      </Field>
+                    );
+                  })}
+                </FieldGroup>
+                {fieldState.invalid && (
+                  <p className="mt-1 text-sm text-red-500">
+                    Pilih minimal 1 agama
+                  </p>
+                )}
+              </FieldSet>
+            )}
+          />
+
+          {/* Poin */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Poin Tepat Waktu</label>
-              <Input
-                type="number"
-                {...form.register("poinTepatWaktu")}
-                placeholder="10"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Poin Telat / Denda</label>
-              <Input
-                type="number"
-                {...form.register("poinTelat")}
-                placeholder="-5"
-              />
-            </div>
+            <Controller
+              name="poinTepatWaktu"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Poin Tepat Waktu</FieldLabel>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    {...field}
+                    placeholder="10"
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+            <Controller
+              name="poinTelat"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    Poin Telat / Denda
+                  </FieldLabel>
+                  <Input
+                    id={field.name}
+                    type="number"
+                    {...field}
+                    placeholder="-5"
+                    aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
           </div>
 
-          <div className="space-y-3 pt-2">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                {...form.register("isMandatory")}
-                className="h-4 w-4"
-              />
-              Kegiatan Wajib (Mandatory)
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                {...form.register("isActive")}
-                className="h-4 w-4"
-              />
-              Sesi Aktif
-            </label>
-          </div>
+          {/* Checkbox Boolean */}
+          <Controller
+            name="isMandatory"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field
+                orientation="horizontal"
+                data-invalid={fieldState.invalid}
+                className="items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  id="isMandatory"
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="h-4 w-4"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldLabel htmlFor="isMandatory" className="font-medium">
+                  Kegiatan Wajib (Mandatory)
+                </FieldLabel>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+          <Controller
+            name="isActive"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field
+                orientation="horizontal"
+                data-invalid={fieldState.invalid}
+                className="items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="h-4 w-4"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldLabel htmlFor="isActive" className="font-medium">
+                  Sesi Aktif
+                </FieldLabel>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
 
           <div className="flex justify-end pt-4">
             <Button type="submit" disabled={isPending}>

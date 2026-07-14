@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/pengaturan/page.tsx
 "use client";
 
 import { api } from "~/trpc/react";
@@ -15,7 +16,8 @@ import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
 import { KategoriFormDialog } from "~/_components/pengaturan/kategori-form-dialog";
 import { SesiFormDialog } from "~/_components/pengaturan/sesi-form-dialog";
-import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form-dialog"; // Komponen baru
+import { PelanggaranFormDialog } from "~/_components/pengaturan/pelanggaran-form-dialog";
+import { Trash2 } from "lucide-react";
 
 export default function PengaturanPage() {
   const utils = api.useUtils();
@@ -32,6 +34,22 @@ export default function PengaturanPage() {
       toast.success("Akun berhasil disetujui!");
       utils.pengaturan.getAllUsers.invalidate();
     },
+  });
+
+  const deleteKategoriMutation = api.pengaturan.deleteKategori.useMutation({
+    onSuccess: () => {
+      toast.success("Kategori berhasil dihapus");
+      void utils.pengaturan.getKategoriWithSesi.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteSesiMutation = api.pengaturan.deleteSesi.useMutation({
+    onSuccess: () => {
+      toast.success("Sesi berhasil dihapus");
+      void utils.pengaturan.getKategoriWithSesi.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const unapprovedUsers = users?.filter((u) => !u.accountApproved) || [];
@@ -148,6 +166,21 @@ export default function PengaturanPage() {
                     <div className="flex gap-2">
                       <SesiFormDialog kategoriId={kategori.id} />
                       <KategoriFormDialog initialData={kategori} />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              "Hapus kategori ini? Semua sesi terkait akan ikut terhapus.",
+                            )
+                          ) {
+                            deleteKategoriMutation.mutate({ id: kategori.id });
+                          }
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                      </Button>
                     </div>
                   </div>
 
@@ -197,6 +230,18 @@ export default function PengaturanPage() {
                                 kategoriId={kategori.id}
                                 initialData={sesi}
                               />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-500"
+                                onClick={() => {
+                                  if (confirm("Hapus sesi ini?")) {
+                                    deleteSesiMutation.mutate({ id: sesi.id });
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}

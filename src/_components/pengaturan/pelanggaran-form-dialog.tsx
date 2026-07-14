@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { z } from "zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "~/trpc/react";
-import { Button, buttonVariants } from "~/components/ui/button"; // <-- Import buttonVariants
+import { Button, buttonVariants } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,12 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Input } from "~/components/ui/input";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "~/components/ui/field";
 import { toast } from "sonner";
 import { Plus, Edit } from "lucide-react";
 
@@ -30,7 +36,7 @@ const formSchema = z.object({
   poinMinus: z.coerce
     .number()
     .max(-1, "Poin harus bernilai negatif (contoh: -10)"),
-  isActive: z.boolean().default(true),
+  isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -56,6 +62,7 @@ export function PelanggaranFormDialog({ initialData }: { initialData?: any }) {
       setOpen(false);
       form.reset();
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const updateMutation = api.pengaturan.updatePelanggaran.useMutation({
@@ -64,6 +71,7 @@ export function PelanggaranFormDialog({ initialData }: { initialData?: any }) {
       utils.pengaturan.getMasterPelanggaran.invalidate();
       setOpen(false);
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const onSubmit = (data: FormValues) => {
@@ -76,7 +84,6 @@ export function PelanggaranFormDialog({ initialData }: { initialData?: any }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {/* MENGGUNAKAN BUTTON VARIANTS PADA TRIGGER */}
       <DialogTrigger
         className={
           initialData
@@ -100,56 +107,115 @@ export function PelanggaranFormDialog({ initialData }: { initialData?: any }) {
             {initialData ? "Edit Pelanggaran" : "Tambah Pelanggaran Baru"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Nama Kategori Pelanggaran
-            </label>
-            <Input
-              {...form.register("namaPelanggaran")}
-              placeholder="Contoh: Pelanggaran Berat"
-            />
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Tingkat Pelanggaran</label>
-            <Select
-              value={form.watch("tingkat")}
-              onValueChange={(val: any) => form.setValue("tingkat", val)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih tingkat" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="RINGAN">Ringan</SelectItem>
-                <SelectItem value="SEDANG">Sedang</SelectItem>
-                <SelectItem value="BERAT">Berat</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-6">
+          {/* Nama Pelanggaran */}
+          <Controller
+            name="namaPelanggaran"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name}>
+                  Nama Kategori Pelanggaran
+                </FieldLabel>
+                <Input
+                  id={field.name}
+                  {...field}
+                  placeholder="Contoh: Pelanggaran Berat"
+                  aria-invalid={fieldState.invalid}
+                />
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Poin Minus (Denda)</label>
-            <Input
-              type="number"
-              {...form.register("poinMinus")}
-              placeholder="-10"
-            />
-            <p className="text-muted-foreground text-xs">
-              Gunakan angka negatif. Contoh: -15
-            </p>
-          </div>
+          {/* Tingkat Pelanggaran (Select) */}
+          <Controller
+            name="tingkat"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name}>
+                  Tingkat Pelanggaran
+                </FieldLabel>
+                <Select
+                  name={field.name}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
+                  <SelectTrigger
+                    id={field.name}
+                    aria-invalid={fieldState.invalid}
+                    className="w-full"
+                  >
+                    <SelectValue placeholder="Pilih tingkat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RINGAN">Ringan</SelectItem>
+                    <SelectItem value="SEDANG">Sedang</SelectItem>
+                    <SelectItem value="BERAT">Berat</SelectItem>
+                  </SelectContent>
+                </Select>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
 
-          <div className="space-y-2 pt-2">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                {...form.register("isActive")}
-                className="h-4 w-4"
-              />
-              Aktif (Bisa digunakan oleh Wali Asuh)
-            </label>
-          </div>
+          {/* Poin Minus */}
+          <Controller
+            name="poinMinus"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name}>Poin Minus (Denda)</FieldLabel>
+                <Input
+                  id={field.name}
+                  type="number"
+                  {...field}
+                  placeholder="-10"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldDescription>
+                  Gunakan angka negatif. Contoh: -15
+                </FieldDescription>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
+
+          {/* Status Aktif */}
+          <Controller
+            name="isActive"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field
+                orientation="horizontal"
+                data-invalid={fieldState.invalid}
+                className="items-center gap-2"
+              >
+                <input
+                  type="checkbox"
+                  id={field.name}
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="h-4 w-4"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldLabel htmlFor={field.name} className="font-medium">
+                  Aktif (Bisa digunakan oleh Wali Asuh)
+                </FieldLabel>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
 
           <div className="flex justify-end pt-4">
             <Button

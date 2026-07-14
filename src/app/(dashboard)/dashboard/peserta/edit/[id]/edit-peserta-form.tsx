@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/peserta/edit/[id]/edit-peserta-form.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -26,18 +27,27 @@ import {
   FieldDescription,
 } from "~/components/ui/field";
 
-// 1. Skema Validasi (Sama persis dengan tambah peserta)
+const agamaEnum = z.enum([
+  "ISLAM",
+  "KRISTEN",
+  "KATOLIK",
+  "HINDU",
+  "BUDHA",
+  "KONGHUCU",
+  "LAINNYA",
+]);
+
 const formSchema = z.object({
-  id: z.string(), // Tambahan ID untuk kebutuhan update
+  id: z.string(),
   nipd: z.string().min(1, "NIPD wajib diisi"),
   namaLengkap: z.string().min(1, "Nama wajib diisi"),
   kelasId: z.string().min(1, "Kelas wajib dipilih"),
+  agama: agamaEnum,
   waliAsuhId: z.string().optional(),
   nisn: z.string().optional(),
   jenisKelamin: z.string().optional(),
   tempatLahir: z.string().optional(),
   tanggalLahir: z.string().optional(),
-  agama: z.string().optional(),
   anakKe: z.string().optional(),
   sekolahAsal: z.string().optional(),
   noAkte: z.string().optional(),
@@ -77,7 +87,6 @@ const demoFields: FieldConfig[] = [
   { name: "nisn", label: "NISN" },
   { name: "tempatLahir", label: "Tempat Lahir" },
   { name: "tanggalLahir", label: "Tanggal Lahir", type: "date" },
-  { name: "agama", label: "Agama" },
   { name: "anakKe", label: "Anak Ke-", desc: "Contoh: 1" },
   { name: "sekolahAsal", label: "Sekolah Asal" },
 ];
@@ -115,7 +124,6 @@ const ayahFields: FieldConfig[] = [
   { name: "penghasilanAyah", label: "Penghasilan Ayah" },
 ];
 
-// Helper untuk mengubah tanggal dari DB menjadi format HTML Date Input (YYYY-MM-DD)
 const formatDateForInput = (dateStr: string | null | undefined | Date) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -145,19 +153,17 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    // Map data dari DB ke form. Jika null, jadikan string kosong
     defaultValues: {
       id: initialData.id,
       nipd: initialData.nipd || "",
       namaLengkap: initialData.namaLengkap || "",
       kelasId: initialData.kelasId || "",
+      agama: initialData.agama ?? "ISLAM",
       waliAsuhId: initialData.waliAsuhId || "unassigned",
       jenisKelamin: initialData.jenisKelamin || "",
-      // Field opsional
       nisn: initialData.nisn || "",
       tempatLahir: initialData.tempatLahir || "",
       tanggalLahir: formatDateForInput(initialData.tanggalLahir),
-      agama: initialData.agama || "",
       anakKe: initialData.anakKe || "",
       sekolahAsal: initialData.sekolahAsal || "",
       noAkte: initialData.noAkte || "",
@@ -170,7 +176,6 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
       kecamatan: initialData.kecamatan || "",
       kodePos: initialData.kodePos || "",
       noTelp: initialData.noTelp || "",
-      // Data Ibu
       namaIbu: initialData.namaIbu || "",
       tempatLahirIbu: initialData.tempatLahirIbu || "",
       tanggalLahirIbu: formatDateForInput(initialData.tanggalLahirIbu),
@@ -178,7 +183,6 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
       pekerjaanIbu: initialData.pekerjaanIbu || "",
       penghasilanIbu: initialData.penghasilanIbu || "",
       nikIbu: initialData.nikIbu || "",
-      // Data Ayah
       namaAyah: initialData.namaAyah || "",
       tempatLahirAyah: initialData.tempatLahirAyah || "",
       tanggalLahirAyah: formatDateForInput(initialData.tanggalLahirAyah),
@@ -241,12 +245,12 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* KARTU 1: WAJIB */}
         <Card className="border-l-primary border-l-4">
           <CardHeader>
             <CardTitle>Identitas Utama (Wajib)</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2">
+            {/* NIPD */}
             <Controller
               name="nipd"
               control={form.control}
@@ -267,6 +271,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
               )}
             />
 
+            {/* Nama Lengkap */}
             <Controller
               name="namaLengkap"
               control={form.control}
@@ -285,6 +290,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
               )}
             />
 
+            {/* Kelas */}
             <Controller
               name="kelasId"
               control={form.control}
@@ -332,6 +338,78 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
               }}
             />
 
+            {/* AGAMA (WAJIB, dropdown) */}
+            <Controller
+              name="agama"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Agama *</FieldLabel>
+                  <Select
+                    name={field.name}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
+                    >
+                      <SelectValue placeholder="Pilih Agama" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agamaEnum.options.map((agama) => (
+                        <SelectItem key={agama} value={agama}>
+                          {agama.charAt(0) + agama.slice(1).toLowerCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        {/* KARTU 2: DEMOGRAFI & ASAL – wali asuh dipindah ke sini */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Demografi & Asal</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-2">
+            {/* Jenis Kelamin */}
+            <Controller
+              name="jenisKelamin"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Jenis Kelamin</FieldLabel>
+                  <Select
+                    name={field.name}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
+                    >
+                      <SelectValue placeholder="Pilih Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="L">Laki-laki (L)</SelectItem>
+                      <SelectItem value="P">Perempuan (P)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
+            />
+
+            {/* Wali Asuh (dipindah dari Kartu 1) */}
             <Controller
               name="waliAsuhId"
               control={form.control}
@@ -342,7 +420,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
                 return (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor={field.name}>
-                      Pilih Wali Asuh (Opsional)
+                      Wali Asuh (Opsional)
                     </FieldLabel>
                     <Select
                       name={field.name}
@@ -384,47 +462,13 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
                 );
               }}
             />
-          </CardContent>
-        </Card>
 
-        {/* KARTU 2: DEMOGRAFI */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Demografi & Asal</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-6 md:grid-cols-2">
-            <Controller
-              name="jenisKelamin"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Jenis Kelamin</FieldLabel>
-                  <Select
-                    name={field.name}
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                    >
-                      <SelectValue placeholder="Pilih Gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="L">Laki-laki (L)</SelectItem>
-                      <SelectItem value="P">Perempuan (P)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {fieldState.invalid && (
-                    <FieldError errors={[fieldState.error]} />
-                  )}
-                </Field>
-              )}
-            />
+            {/* Field demografi lainnya – agama sudah tidak di sini */}
             {renderFields(demoFields)}
           </CardContent>
         </Card>
 
+        {/* KARTU 3: DOKUMEN & ALAMAT */}
         <Card>
           <CardHeader>
             <CardTitle>Dokumen & Alamat</CardTitle>
@@ -434,6 +478,7 @@ export function EditPesertaForm({ initialData }: { initialData: any }) {
           </CardContent>
         </Card>
 
+        {/* KARTU 4: ORANG TUA */}
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>

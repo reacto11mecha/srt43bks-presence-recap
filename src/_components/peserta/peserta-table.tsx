@@ -1,3 +1,4 @@
+// src/_components/peserta/peserta-table.tsx
 "use client";
 
 import { useMemo } from "react";
@@ -81,7 +82,6 @@ export function PesertaTable() {
           nisn: false,
           tempatLahir: false,
           tanggalLahir: false,
-          agama: false,
           alamat: false,
           noTelp: false,
           namaIbu: false,

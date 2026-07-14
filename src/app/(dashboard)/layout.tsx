@@ -1,6 +1,9 @@
 import { UserNav } from "~/_components/layout/user-nav";
 import { Sidebar } from "~/_components/layout/sidebar";
 import { redirect } from "next/navigation";
+import { db } from "~/server/db";
+import { user } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 import { getSession } from "~/server/better-auth/server";
 import {
   Sheet,
@@ -19,6 +22,19 @@ export default async function DashboardLayout({
   const auth = await getSession();
 
   if (!auth) redirect("/login");
+
+  const currentUser = await db.query.user.findFirst({
+    where: eq(user.id, auth.user.id),
+    columns: { accountApproved: true, email: true, name: true },
+  });
+
+  if (!currentUser) {
+    redirect("/login");
+  }
+
+  if (!currentUser.accountApproved) {
+    redirect("/");
+  }
 
   return (
     <div className="bg-background flex min-h-screen w-full">

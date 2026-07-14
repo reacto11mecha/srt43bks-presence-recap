@@ -1,3 +1,4 @@
+// src/app/(dashboard)/dashboard/peserta/tambah/page.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -32,17 +33,28 @@ import {
   FieldDescription,
 } from "~/components/ui/field";
 
-// 1. Skema Validasi Ekstensif
+// Enum agama yang sama dengan backend
+const agamaEnum = z.enum([
+  "ISLAM",
+  "KRISTEN",
+  "KATOLIK",
+  "HINDU",
+  "BUDHA",
+  "KONGHUCU",
+  "LAINNYA",
+]);
+
+// 1. Skema Validasi – agama sekarang wajib
 const formSchema = z.object({
   nipd: z.string().min(1, "NIPD wajib diisi"),
   namaLengkap: z.string().min(1, "Nama wajib diisi"),
   kelasId: z.string().min(1, "Kelas wajib dipilih"),
+  agama: agamaEnum, // wajib pilih
   waliAsuhId: z.string().optional(),
   nisn: z.string().optional(),
   jenisKelamin: z.string().optional(),
   tempatLahir: z.string().optional(),
   tanggalLahir: z.string().optional(),
-  agama: z.string().optional(),
   anakKe: z.string().optional(),
   sekolahAsal: z.string().optional(),
   noAkte: z.string().optional(),
@@ -71,7 +83,6 @@ const formSchema = z.object({
   nikAyah: z.string().optional(),
 });
 
-// 2. Definisi Array Konfigurasi Field agar DRY (Don't Repeat Yourself)
 type FieldConfig = {
   name: keyof z.infer<typeof formSchema>;
   label: string;
@@ -79,11 +90,11 @@ type FieldConfig = {
   desc?: string;
 };
 
+// Agama sudah dikeluarkan dari sini karena dijadikan dropdown terpisah
 const demoFields: FieldConfig[] = [
   { name: "nisn", label: "NISN" },
   { name: "tempatLahir", label: "Tempat Lahir" },
   { name: "tanggalLahir", label: "Tanggal Lahir", type: "date" },
-  { name: "agama", label: "Agama" },
   { name: "anakKe", label: "Anak Ke-", desc: "Contoh: 1" },
   { name: "sekolahAsal", label: "Sekolah Asal" },
 ];
@@ -132,7 +143,6 @@ export default function TambahPesertaPage() {
   const createPesertaMutation = api.peserta.createPeserta.useMutation({
     onSuccess: async () => {
       await utils.peserta.getAll.invalidate();
-
       router.push("/dashboard/peserta");
       toast.success("Berhasil menambahkan peserta!");
     },
@@ -153,7 +163,6 @@ export default function TambahPesertaPage() {
     createPesertaMutation.mutate(data);
   }
 
-  // Helper render input teks & tanggal secara dinamis
   const renderFields = (fields: FieldConfig[]) =>
     fields.map((f) => (
       <Controller
@@ -196,14 +205,13 @@ export default function TambahPesertaPage() {
             Tambah Peserta Didik
           </h2>
           <p className="text-muted-foreground">
-            Isi form di bawah ini. Kolom selain identitas utama bersifat
-            opsional.
+            Isi form di bawah ini. Kolom identitas utama wajib diisi.
           </p>
         </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* KARTU 1: WAJIB */}
+        {/* KARTU 1: IDENTITAS UTAMA (WAJIB) – sekarang termasuk Agama */}
         <Card className="border-l-primary border-l-4">
           <CardHeader>
             <CardTitle>Identitas Utama (Wajib)</CardTitle>
@@ -212,6 +220,7 @@ export default function TambahPesertaPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2">
+            {/* NIPD */}
             <Controller
               name="nipd"
               control={form.control}
@@ -235,6 +244,7 @@ export default function TambahPesertaPage() {
               )}
             />
 
+            {/* Nama Lengkap */}
             <Controller
               name="namaLengkap"
               control={form.control}
@@ -253,6 +263,7 @@ export default function TambahPesertaPage() {
               )}
             />
 
+            {/* Kelas */}
             <Controller
               name="kelasId"
               control={form.control}
@@ -260,7 +271,6 @@ export default function TambahPesertaPage() {
                 const selectedKelas = daftarKelas.find(
                   (k) => k.id === field.value,
                 );
-
                 return (
                   <Field data-invalid={fieldState.invalid}>
                     <FieldLabel htmlFor={field.name}>
@@ -301,74 +311,51 @@ export default function TambahPesertaPage() {
               }}
             />
 
+            {/* AGAMA (WAJIB, dropdown) – ditambahkan di sini */}
             <Controller
-              name="waliAsuhId"
+              name="agama"
               control={form.control}
-              render={({ field, fieldState }) => {
-                // Cari data wali asuh yang cocok dengan ID yang sedang dipilih
-                const selectedWali = daftarWali.find(
-                  (w) => w.id === field.value,
-                );
-
-                return (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      Pilih Wali Asuh (Opsional)
-                    </FieldLabel>
-                    <Select
-                      name={field.name}
-                      value={field.value}
-                      onValueChange={field.onChange}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name}>Agama *</FieldLabel>
+                  <Select
+                    name={field.name}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
                     >
-                      <SelectTrigger
-                        id={field.name}
-                        aria-invalid={fieldState.invalid}
-                      >
-                        {/* Sisipkan logika manual ke dalam SelectValue */}
-                        <SelectValue
-                          placeholder={
-                            loadingWali ? "Memuat..." : "Pilih Wali Asuh"
-                          }
-                        >
-                          {field.value === "unassigned"
-                            ? "-- Belum ditugaskan --"
-                            : selectedWali?.name}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="unassigned"
-                          className="text-muted-foreground font-medium"
-                        >
-                          -- Belum ditugaskan --
+                      <SelectValue placeholder="Pilih Agama" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agamaEnum.options.map((agama) => (
+                        <SelectItem key={agama} value={agama}>
+                          {agama.charAt(0) + agama.slice(1).toLowerCase()}
                         </SelectItem>
-                        {daftarWali.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldDescription>
-                      User yang akan bertanggung jawab pada anak ini.
-                    </FieldDescription>
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                );
-              }}
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {fieldState.invalid && (
+                    <FieldError errors={[fieldState.error]} />
+                  )}
+                </Field>
+              )}
             />
           </CardContent>
         </Card>
 
-        {/* KARTU 2: DEMOGRAFI */}
+        {/* KARTU 2: DEMOGRAFI & ASAL – wali asuh dipindahkan ke sini */}
         <Card>
           <CardHeader>
             <CardTitle>Demografi & Asal</CardTitle>
-            <CardDescription>Informasi tambahan profil anak.</CardDescription>
+            <CardDescription>
+              Informasi tambahan profil anak dan wali asuh.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2">
+            {/* Jenis Kelamin */}
             <Controller
               name="jenisKelamin"
               control={form.control}
@@ -397,6 +384,65 @@ export default function TambahPesertaPage() {
                 </Field>
               )}
             />
+
+            {/* Wali Asuh (dipindah dari Kartu 1) */}
+            <Controller
+              name="waliAsuhId"
+              control={form.control}
+              render={({ field, fieldState }) => {
+                const selectedWali = daftarWali.find(
+                  (w) => w.id === field.value,
+                );
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name}>
+                      Wali Asuh (Opsional)
+                    </FieldLabel>
+                    <Select
+                      name={field.name}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger
+                        id={field.name}
+                        aria-invalid={fieldState.invalid}
+                      >
+                        <SelectValue
+                          placeholder={
+                            loadingWali ? "Memuat..." : "Pilih Wali Asuh"
+                          }
+                        >
+                          {field.value === "unassigned"
+                            ? "-- Belum ditugaskan --"
+                            : selectedWali?.name}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          value="unassigned"
+                          className="text-muted-foreground font-medium"
+                        >
+                          -- Belum ditugaskan --
+                        </SelectItem>
+                        {daftarWali.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      User yang bertanggung jawab pada anak ini.
+                    </FieldDescription>
+                    {fieldState.invalid && (
+                      <FieldError errors={[fieldState.error]} />
+                    )}
+                  </Field>
+                );
+              }}
+            />
+
+            {/* Field demografi lainnya (nisn, tempatLahir, dll) – agama sudah tidak di sini */}
             {renderFields(demoFields)}
           </CardContent>
         </Card>

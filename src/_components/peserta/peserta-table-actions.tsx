@@ -1,3 +1,4 @@
+// src/_components/peserta/peserta-table-actions.tsx
 "use client";
 
 import { useState, useRef } from "react";
@@ -23,15 +24,16 @@ import {
   TableRow,
 } from "~/components/ui/table";
 
+// ⬇️ URUTAN KOLOM BARU: agama dipindah tepat setelah kelasId
 const columnOrder = [
   "nipd",
   "namaLengkap",
   "kelasId",
+  "agama", // ← pindah ke sini
   "nisn",
   "jenisKelamin",
   "tempatLahir",
   "tanggalLahir",
-  "agama",
   "anakKe",
   "noAkte",
   "nik",
@@ -68,7 +70,6 @@ export function PesertaTableActions() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
 
-  // Ambil data kelas khusus untuk kebutuhan pembuatan Template Excel
   const { data: daftarKelas = [] } = api.peserta.getAllKelas.useQuery();
 
   const createBanyakPesertaMutation =
@@ -137,6 +138,10 @@ export function PesertaTableActions() {
           "JANGAN ketik nama kelas (seperti 10 A). Buka sheet '3. Referensi Kelas', COPY kode ID kelas yang sesuai, lalu PASTE di kolom ini.",
         ],
         [
+          "Agama (WAJIB)",
+          "Isi dengan salah satu pilihan: ISLAM, KRISTEN, KATOLIK, HINDU, BUDHA, KONGHUCU, LAINNYA. Jika tidak ada, gunakan ISLAM.",
+        ],
+        [
           "Jenis_Kelamin",
           "Isi dengan huruf kapital 'L' untuk Laki-laki atau 'P' untuk Perempuan.",
         ],
@@ -149,7 +154,7 @@ export function PesertaTableActions() {
           "Nomor telepon/WA. Gunakan awalan angka biasa, contoh: 08123456789.",
         ],
         [
-          "Data Lainnya (Agama, NIK, dll)",
+          "Data Lainnya (NISN, NIK, dll)", // ⬅️ kata "Agama" dihapus dari sini
           "Bersifat opsional. Jika datanya tidak ada, biarkan sel tersebut kosong (jangan diisi tanda strip/dll).",
         ],
       ];
@@ -176,11 +181,11 @@ export function PesertaTableActions() {
         "NIPD (WAJIB)",
         "Nama_Lengkap (WAJIB)",
         "ID_Kelas (WAJIB - Lihat Sheet Referensi)",
+        "Agama (WAJIB)",
         "NISN",
         "Jenis_Kelamin",
         "Tempat_Lahir",
         "Tanggal_Lahir",
-        "Agama",
         "Anak_Ke",
         "No_Akte",
         "NIK",
@@ -219,9 +224,9 @@ export function PesertaTableActions() {
       sheetForm.columns.forEach((column) => {
         column.width = 25;
       });
-      sheetForm.getColumn(3).width = 45;
+      sheetForm.getColumn(3).width = 45; // ID Kelas
 
-      // --- SHEET 3: REFERENSI KELAS ---
+      // --- SHEET 3: REFERENSI KELAS (tidak berubah) ---
       const sheetKelas = workbook.addWorksheet("3. Referensi Kelas", {
         views: [{ state: "frozen", ySplit: 1 }],
       });
@@ -306,6 +311,7 @@ export function PesertaTableActions() {
               if (cellValue) return [key, new Date(cellValue).toISOString()];
               return [key, undefined];
             }
+            // Agama sekarang bisa dikirim apa adanya, validasi enum dilakukan oleh Zod di backend
             return [key, cellValue || undefined];
           }),
         ) as InsertPesertaType;
@@ -387,6 +393,8 @@ export function PesertaTableActions() {
                   <TableHead>NIPD</TableHead>
                   <TableHead>Nama Lengkap</TableHead>
                   <TableHead>ID Kelas</TableHead>
+                  <TableHead>Agama</TableHead>{" "}
+                  {/* ⬅️ tambah kolom agama di preview */}
                   <TableHead>L/P</TableHead>
                 </TableRow>
               </TableHeader>
@@ -400,13 +408,14 @@ export function PesertaTableActions() {
                     <TableCell className="max-w-[150px] truncate font-mono text-xs">
                       {p.kelasId}
                     </TableCell>
+                    <TableCell>{p.agama}</TableCell> {/* ⬅️ tampilkan agama */}
                     <TableCell>{p.jenisKelamin}</TableCell>
                   </TableRow>
                 ))}
                 {previewData.length > 50 && (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5} // ⬅️ sesuaikan jumlah kolom
                       className="text-muted-foreground h-12 text-center text-sm"
                     >
                       ... dan {previewData.length - 50} data lainnya.
