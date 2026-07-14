@@ -1,38 +1,178 @@
 // src/server/api/routers/aktivitas.ts
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { desc, eq, asc } from "drizzle-orm";
+import { desc, eq, asc, and, gte, lte, like, isNotNull } from "drizzle-orm";
 import {
   logAbsensi,
   pesertaDidik,
   kategoriAbsensi,
   sesiAbsensi,
   masterPelanggaran,
+  kelas,
+  user,
 } from "~/server/db/schema";
+
+// Enum untuk opsi filter
+const statusKehadiranEnum = z.enum([
+  "HADIR",
+  "TIDAK_HADIR",
+  "IZIN",
+  "SAKIT",
+  "ALFA",
+  "LAINNYA",
+]);
+
+const tipeLogEnum = z.enum(["SESI", "PELANGGARAN"]);
 
 export const aktivitasRouter = createTRPCRouter({
   // --------------------------------------------------------
-  // 1. GET RECENT LOGS (Tabel Riwayat)
+  // 1. GET RECENT LOGS (Dengan Filter & Pencarian)
   // --------------------------------------------------------
-  getRecentLogs: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.query.logAbsensi.findMany({
-      with: {
+  getRecentLogs: protectedProcedure
+    .input(
+      z.object({
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        jenjang: z.enum(["SD", "SMP", "SMA"]).optional(),
+        tingkat: z.string().optional(),
+        kelasId: z.string().optional(),
+        sesiId: z.string().optional(),
+        namaSiswa: z.string().optional(),
+        statusKehadiran: statusKehadiranEnum.optional(),
+        tipeLog: tipeLogEnum.optional(),
+        limit: z.number().min(1).max(200).default(100),
+      }).optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const conditions = [];
+
+      if (input?.startDate) {
+        conditions.push(gte(logAbsensi.tanggal, input.startDate));
+      }
+      if (input?.endDate) {
+        conditions.push(lte(logAbsensi.tanggal, input.endDate));
+      }
+      if (input?.sesiId) {
+        conditions.push(eq(logAbsensi.sesiId, input.sesiId));
+      }
+      if (input?.statusKehadiran) {
+        conditions.push(eq(logAbsensi.statusKehadiran, input.statusKehadiran));
+      }
+      if (input?.tipeLog === "SESI") {
+        conditions.push(isNotNull(logAbsensi.sesiId));
+      } else if (input?.tipeLog === "PELANGGARAN") {
+        conditions.push(isNotNull(logAbsensi.pelanggaranId));
+      }
+
+      // Query dengan kolom flat
+      const rows = await ctx.db
+        .select({
+          // Log Absensi
+          id: logAbsensi.id,
+          tanggal: logAbsensi.tanggal,
+          waktuScan: logAbsensi.waktuScan,
+          statusKehadiran: logAbsensi.statusKehadiran,
+          statusWaktu: logAbsensi.statusWaktu,
+          poinDidapat: logAbsensi.poinDidapat,
+          isPoinManual: logAbsensi.isPoinManual,
+          keterangan: logAbsensi.keterangan,
+
+          // Peserta Didik
+          pesertaId: pesertaDidik.id,
+          pesertaNama: pesertaDidik.namaLengkap,
+
+          // Kelas
+          kelasId: kelas.id,
+          kelasJenjang: kelas.jenjang,
+          kelasTingkat: kelas.tingkat,
+          kelasNama: kelas.namaKelas,
+
+          // Sesi Absensi (nullable)
+          sesiId: sesiAbsensi.id,
+          sesiNama: sesiAbsensi.namaSesi,
+
+          // Kategori Absensi (nullable)
+          kategoriId: kategoriAbsensi.id,
+          kategoriNama: kategoriAbsensi.namaKategori,
+
+          // Master Pelanggaran (nullable)
+          pelanggaranId: masterPelanggaran.id,
+          pelanggaranNama: masterPelanggaran.namaPelanggaran,
+          pelanggaranTingkat: masterPelanggaran.tingkat,
+
+          // User (wali asuh)
+          waliAsuhId: user.id,
+          waliAsuhName: user.name,
+        })
+        .from(logAbsensi)
+        .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .leftJoin(sesiAbsensi, eq(logAbsensi.sesiId, sesiAbsensi.id))
+        .leftJoin(kategoriAbsensi, eq(sesiAbsensi.kategoriId, kategoriAbsensi.id))
+        .leftJoin(masterPelanggaran, eq(logAbsensi.pelanggaranId, masterPelanggaran.id))
+        .leftJoin(user, eq(logAbsensi.waliAsuhId, user.id))
+        .where(
+          and(
+            ...conditions,
+            input?.jenjang ? eq(kelas.jenjang, input.jenjang) : undefined,
+            input?.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
+            input?.kelasId ? eq(kelas.id, input.kelasId) : undefined,
+            input?.namaSiswa
+              ? like(pesertaDidik.namaLengkap, `%${input.namaSiswa}%`)
+              : undefined,
+          )
+        )
+        .orderBy(desc(logAbsensi.waktuScan))
+        .limit(input?.limit ?? 100);
+
+      // Mapping ke bentuk nested yang diharapkan frontend
+      const results = rows.map((row) => ({
+        id: row.id,
+        tanggal: row.tanggal,
+        waktuScan: row.waktuScan,
+        statusKehadiran: row.statusKehadiran,
+        statusWaktu: row.statusWaktu,
+        poinDidapat: row.poinDidapat,
+        isPoinManual: row.isPoinManual,
+        keterangan: row.keterangan,
         pesertaDidik: {
-          with: { kelas: true },
+          id: row.pesertaId,
+          namaLengkap: row.pesertaNama,
+          kelas: {
+            jenjang: row.kelasJenjang,
+            tingkat: row.kelasTingkat,
+            namaKelas: row.kelasNama,
+          },
         },
-        sesi: {
-          with: { kategori: true }, // Ambil kategori (Solat, Makan, dll) melalui relasi sesi
-        },
-        pelanggaran: true, // Data master pelanggaran jika tipe log adalah pelanggaran
-        waliAsuh: true,
-      },
-      orderBy: [desc(logAbsensi.waktuScan)],
-      limit: 100,
-    });
-  }),
+        sesi: row.sesiId
+          ? {
+              id: row.sesiId,
+              namaSesi: row.sesiNama,
+              kategori: row.kategoriId
+                ? { namaKategori: row.kategoriNama }
+                : null,
+            }
+          : null,
+        pelanggaran: row.pelanggaranId
+          ? {
+              id: row.pelanggaranId,
+              namaPelanggaran: row.pelanggaranNama,
+              tingkat: row.pelanggaranTingkat,
+            }
+          : null,
+        waliAsuh: row.waliAsuhId
+          ? {
+              id: row.waliAsuhId,
+              name: row.waliAsuhName,
+            }
+          : null,
+      }));
+
+      return results;
+    }),
 
   // --------------------------------------------------------
-  // 2. GET FORM OPTIONS (Data Dropdown untuk Form Manual)
+  // 2. GET FORM OPTIONS (untuk dropdown filter & form manual)
   // --------------------------------------------------------
   getFormOptions: protectedProcedure.query(async ({ ctx }) => {
     const peserta = await ctx.db.query.pesertaDidik.findMany({
@@ -47,31 +187,35 @@ export const aktivitasRouter = createTRPCRouter({
       orderBy: [asc(kategoriAbsensi.namaKategori)],
     });
 
-    // Tambahan: Ambil data master pelanggaran untuk form dropdown
     const pelanggaran = await ctx.db.query.masterPelanggaran.findMany({
       where: eq(masterPelanggaran.isActive, true),
       orderBy: [asc(masterPelanggaran.tingkat)],
     });
 
-    return { peserta, kategori, pelanggaran };
+    // Kembalikan juga daftar kelas untuk filter
+    const semuaKelas = await ctx.db.query.kelas.findMany({
+      orderBy: [asc(kelas.jenjang), asc(kelas.tingkat), asc(kelas.namaKelas)],
+    });
+
+    return { peserta, kategori, pelanggaran, semuaKelas };
   }),
 
   // --------------------------------------------------------
-  // 3. CREATE LOG MANUAL (Input dari Dashboard)
+  // 3. CREATE LOG MANUAL (tidak berubah)
   // --------------------------------------------------------
   createLogManual: protectedProcedure
     .input(
       z.object({
         pesertaDidikId: z.string(),
-        tipeLog: z.enum(["SESI", "PELANGGARAN"]), // Menentukan cabang logika
+        tipeLog: z.enum(["SESI", "PELANGGARAN"]),
         sesiId: z.string().optional().nullable(),
         pelanggaranId: z.string().optional().nullable(),
         statusKehadiran: z
-          .enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA"])
+          .enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA", "LAINNYA"])
           .default("HADIR"),
         keterangan: z.string().optional(),
-        tanggal: z.string(), // Format YYYY-MM-DD
-        poinOverride: z.number().optional().nullable(), // Input opsional jika Wali Asuh mengedit poin default
+        tanggal: z.string(),
+        poinOverride: z.number().optional().nullable(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -79,7 +223,6 @@ export const aktivitasRouter = createTRPCRouter({
       let isPoinManual = false;
       let statusWaktu: "TEPAT_WAKTU" | "TELAT" | null = null;
 
-      // Logika Penentuan Poin Default
       if (input.tipeLog === "SESI") {
         if (!input.sesiId) throw new Error("Sesi jadwal wajib dipilih!");
 
@@ -88,8 +231,6 @@ export const aktivitasRouter = createTRPCRouter({
         });
         if (!sesi) throw new Error("Sesi tidak ditemukan di database.");
 
-        // Jika manual input "HADIR", asumsikan tepat waktu.
-        // Jika Sakit/Izin/Alfa, poin = 0 (netral).
         if (input.statusKehadiran === "HADIR") {
           poinDidapat = sesi.poinTepatWaktu;
           statusWaktu = "TEPAT_WAKTU";
@@ -109,8 +250,6 @@ export const aktivitasRouter = createTRPCRouter({
         poinDidapat = pelanggaran.poinMinus;
       }
 
-      // Logika Override (Data Immutability Audit)
-      // Jika Wali Asuh memasukkan angka custom di form, timpa poin default & nyalakan flag
       if (input.poinOverride !== undefined && input.poinOverride !== null) {
         poinDidapat = input.poinOverride;
         isPoinManual = true;
@@ -134,7 +273,49 @@ export const aktivitasRouter = createTRPCRouter({
     }),
 
   // --------------------------------------------------------
-  // 4. SCAN QR CODE (Khusus Absensi Rutin via Kamera)
+  // 4. UPDATE LOG MANUAL (Edit)
+  // --------------------------------------------------------
+  updateLogManual: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        statusKehadiran: z
+          .enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA", "LAINNYA"])
+          .optional(),
+        statusWaktu: z.enum(["TEPAT_WAKTU", "TELAT"]).optional().nullable(),
+        poinDidapat: z.number().optional(),
+        keterangan: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const log = await ctx.db.query.logAbsensi.findFirst({
+        where: eq(logAbsensi.id, input.id),
+      });
+      if (!log) throw new Error("Log tidak ditemukan.");
+
+      // Update field yang disediakan
+      const updateData: any = {};
+      if (input.statusKehadiran !== undefined)
+        updateData.statusKehadiran = input.statusKehadiran;
+      if (input.statusWaktu !== undefined)
+        updateData.statusWaktu = input.statusWaktu;
+      if (input.poinDidapat !== undefined) {
+        updateData.poinDidapat = input.poinDidapat;
+        updateData.isPoinManual = true; // Tandai bahwa poin diubah manual
+      }
+      if (input.keterangan !== undefined)
+        updateData.keterangan = input.keterangan;
+
+      await ctx.db
+        .update(logAbsensi)
+        .set(updateData)
+        .where(eq(logAbsensi.id, input.id));
+
+      return { success: true };
+    }),
+
+  // --------------------------------------------------------
+  // 5. SCAN QR CODE (Khusus Absensi Rutin via Kamera)
   // --------------------------------------------------------
   scanQr: protectedProcedure
     .input(

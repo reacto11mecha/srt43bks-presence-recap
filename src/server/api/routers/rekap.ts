@@ -42,13 +42,21 @@ export const rekapRouter = createTRPCRouter({
           id: sesiAbsensi.id,
           namaSesi: sesiAbsensi.namaSesi,
           kategori: kategoriAbsensi.namaKategori,
+          isMandatory: sesiAbsensi.isMandatory,
+          targetAgama: sesiAbsensi.targetAgama,
+          poinAlfa: sesiAbsensi.poinAlfa, // ← ambil poin alfa
         })
         .from(sesiAbsensi)
         .innerJoin(
           kategoriAbsensi,
           eq(sesiAbsensi.kategoriId, kategoriAbsensi.id),
         )
-        .where(arrayContains(sesiAbsensi.targetJenjang, [input.jenjang]));
+        .where(
+          and(
+            eq(sesiAbsensi.isActive, true),
+            arrayContains(sesiAbsensi.targetJenjang, [input.jenjang]),
+          ),
+        );
 
       const groupedSessions = new Map<string, typeof sessions>();
       for (const ses of sessions) {
@@ -98,7 +106,7 @@ export const rekapRouter = createTRPCRouter({
         )
         .where(and(dateFilter, isNotNull(logAbsensi.pelanggaranId)));
 
-      // 3. AGREGASI RINGKASAN (per siswa)
+      // 3. AGREGASI RINGKASAN (tetap, tidak diubah)
       const studentStats = new Map<string, any>();
       for (const s of students) {
         const sessionPoints: Record<string, number> = {};
@@ -134,49 +142,91 @@ export const rekapRouter = createTRPCRouter({
         ringkasanByTingkat[stat.tingkat].push(stat);
       }
 
-      // 4. AGREGASI DETAIL HARIAN (dipisah Ket & Pn)
-      const dailyMatrix = new Map<string, any>();
+      // 4. AGREGASI DETAIL HARIAN (dengan pengecekan targetAgama & poinAlfa)
+      const logMap = new Map<string, (typeof sessionLogs)[0]>();
       for (const log of sessionLogs) {
-        const key = `${log.tanggal}_${log.pesertaDidikId}`;
-        if (!dailyMatrix.has(key)) {
-          const student = students.find((s) => s.id === log.pesertaDidikId);
-          if (!student) continue;
-          const row: any = {
-            tanggal: log.tanggal,
-            ...student,
-            totalPoinHarian: 0,
-          };
-          // Inisialisasi ket & pn untuk setiap sesi
-          sessions.forEach((ses) => {
-            row[`ket_${ses.id}`] = "-";
-            row[`pn_${ses.id}`] = 0;
-          });
-          dailyMatrix.set(key, row);
-        }
-        const row = dailyMatrix.get(key);
-        let statusText = log.statusKehadiran;
-        if (log.statusKehadiran === "HADIR" && log.statusWaktu === "TELAT") {
-          statusText = "TELAT";
-        }
-        row[`ket_${log.sesiId}`] = statusText;
-        row[`pn_${log.sesiId}`] = log.poinDidapat;
-        row.totalPoinHarian += log.poinDidapat;
+        const key = `${log.tanggal}_${log.pesertaDidikId}_${log.sesiId}`;
+        logMap.set(key, log);
       }
+
+      const dateList: string[] = [];
+      const cursor = new Date(input.startDate);
+      const endDateObj = new Date(input.endDate);
+      while (cursor <= endDateObj) {
+        dateList.push(format(cursor, "yyyy-MM-dd"));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
       const detailByTingkat: Record<string, any[]> = {};
-      for (const row of dailyMatrix.values()) {
-        if (!detailByTingkat[row.tingkat]) detailByTingkat[row.tingkat] = [];
-        detailByTingkat[row.tingkat].push(row);
-      }
-
-      // 5. MEMBANGUN WORKBOOK
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = "Sistem Presensi Asrama";
-
       const tingkatKeys = Object.keys(ringkasanByTingkat).sort(
         (a, b) => Number(a) - Number(b),
       );
 
-      // Fungsi untuk header Ringkasan (2 baris) – seperti sebelumnya, tidak berubah
+      for (const t of tingkatKeys) {
+        const rows: any[] = [];
+        const siswaTingkat = students
+          .filter((s) => s.tingkat === t)
+          .sort(
+            (a, b) =>
+              a.namaKelas.localeCompare(b.namaKelas) ||
+              a.namaLengkap.localeCompare(b.namaLengkap),
+          );
+
+        for (const tanggal of dateList) {
+          for (const siswa of siswaTingkat) {
+            const row: any = {
+              tanggal,
+              nipd: siswa.nipd,
+              nama: siswa.namaLengkap,
+              agama: siswa.agama,
+              totalPoinHarian: 0,
+            };
+
+            for (const ses of sessions) {
+              // Periksa apakah siswa termasuk target agama sesi
+              if (!ses.targetAgama.includes(siswa.agama)) {
+                row[`ket_${ses.id}`] = "-";
+                row[`pn_${ses.id}`] = "-";
+                continue;
+              }
+
+              const key = `${tanggal}_${siswa.id}_${ses.id}`;
+              const log = logMap.get(key);
+
+              if (log) {
+                let statusText = log.statusKehadiran;
+                if (
+                  log.statusKehadiran === "HADIR" &&
+                  log.statusWaktu === "TELAT"
+                ) {
+                  statusText = "TELAT";
+                }
+                row[`ket_${ses.id}`] = statusText;
+                row[`pn_${ses.id}`] = log.poinDidapat;
+                row.totalPoinHarian += log.poinDidapat;
+              } else {
+                // Tidak ada log
+                if (ses.isMandatory) {
+                  row[`ket_${ses.id}`] = "ALFA";
+                  row[`pn_${ses.id}`] = ses.poinAlfa; // gunakan poin alfa sesi
+                  row.totalPoinHarian += ses.poinAlfa; // mempengaruhi total poin harian (negatif)
+                } else {
+                  row[`ket_${ses.id}`] = "-";
+                  row[`pn_${ses.id}`] = "-";
+                }
+              }
+            }
+
+            rows.push(row);
+          }
+        }
+        detailByTingkat[t] = rows;
+      }
+
+      // 5. MEMBANGUN WORKBOOK (header & sheet pelanggaran tetap)
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Sistem Presensi Asrama";
+
       const applyRingkasanHeader = (
         ws: ExcelJS.Worksheet,
         staticCols: { header: string; key: string; width: number }[],
@@ -185,7 +235,6 @@ export const rekapRouter = createTRPCRouter({
       ) => {
         ws.columns = columnsDef;
         let colIdx = 1;
-        // Statis
         for (const col of staticCols) {
           ws.mergeCells(1, colIdx, 2, colIdx);
           const cell = ws.getCell(1, colIdx);
@@ -200,7 +249,6 @@ export const rekapRouter = createTRPCRouter({
           ws.getColumn(colIdx).width = col.width;
           colIdx++;
         }
-        // Kategori + sesi
         for (const [kategori, sesiList] of groupedSessions.entries()) {
           const startCol = colIdx;
           const endCol = colIdx + sesiList.length - 1;
@@ -228,7 +276,6 @@ export const rekapRouter = createTRPCRouter({
             colIdx++;
           }
         }
-        // Ekstra
         for (const col of extraCols) {
           ws.mergeCells(1, colIdx, 2, colIdx);
           const cell = ws.getCell(1, colIdx);
@@ -247,7 +294,7 @@ export const rekapRouter = createTRPCRouter({
         ws.getRow(2).height = 20;
       };
 
-      // --- A. Sheet Ringkasan per Tingkat (tetap sama) ---
+      // --- A. Sheet Ringkasan per Tingkat ---
       for (const t of tingkatKeys) {
         const ws = workbook.addWorksheet(`Ringkasan Tkt ${t}`);
         const staticCols = [
@@ -312,7 +359,6 @@ export const rekapRouter = createTRPCRouter({
           { header: "Poin Harian", key: "totalPoinHarian", width: 15 },
         ];
 
-        // Kolom definisi untuk data (setiap sesi memiliki dua kolom: ket & pn)
         const sesiColumns = Array.from(groupedSessions.values()).flatMap(
           (sesiList) =>
             sesiList.flatMap((s) => [
@@ -322,11 +368,9 @@ export const rekapRouter = createTRPCRouter({
         );
         const columnsDef = [...staticCols, ...sesiColumns, ...extraCols];
 
-        // Terapkan header 3 baris
         ws.columns = columnsDef;
         let colIdx = 1;
 
-        // Statis (merge 3 baris)
         for (const col of staticCols) {
           ws.mergeCells(1, colIdx, 3, colIdx);
           const cell = ws.getCell(1, colIdx);
@@ -342,11 +386,9 @@ export const rekapRouter = createTRPCRouter({
           colIdx++;
         }
 
-        // Kategori + sesi (per 2 kolom)
         for (const [kategori, sesiList] of groupedSessions.entries()) {
           const startCol = colIdx;
           const endCol = colIdx + sesiList.length * 2 - 1;
-          // Baris 1: kategori (merge semua kolom sesi di bawahnya)
           ws.mergeCells(1, startCol, 1, endCol);
           const catCell = ws.getCell(1, startCol);
           catCell.value = kategori.toUpperCase();
@@ -361,7 +403,6 @@ export const rekapRouter = createTRPCRouter({
           for (const ses of sesiList) {
             const sesStartCol = colIdx;
             const sesEndCol = colIdx + 1;
-            // Baris 2: nama sesi (merge dua kolom)
             ws.mergeCells(2, sesStartCol, 2, sesEndCol);
             const sesCell = ws.getCell(2, sesStartCol);
             sesCell.value = ses.namaSesi;
@@ -373,7 +414,6 @@ export const rekapRouter = createTRPCRouter({
               fgColor: { argb: "FF4F46E5" },
             };
 
-            // Baris 3: Ket & Pn
             const ketCell = ws.getCell(3, colIdx);
             ketCell.value = "Ket";
             ketCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -400,7 +440,6 @@ export const rekapRouter = createTRPCRouter({
           }
         }
 
-        // Kolom ekstra (merge 3 baris)
         for (const col of extraCols) {
           ws.mergeCells(1, colIdx, 3, colIdx);
           const cell = ws.getCell(1, colIdx);
@@ -420,22 +459,14 @@ export const rekapRouter = createTRPCRouter({
         ws.getRow(2).height = 20;
         ws.getRow(3).height = 18;
 
-        // Data
         const rows = detailByTingkat[t] || [];
-        rows.sort(
-          (a, b) =>
-            a.tanggal.localeCompare(b.tanggal) ||
-            a.namaKelas?.localeCompare(b.namaKelas) ||
-            a.namaLengkap.localeCompare(b.namaLengkap),
-        );
-
         rows.forEach((r) => {
           const rowData: any = {
             tanggal: format(new Date(r.tanggal), "dd MMM yyyy", {
               locale: localeId,
             }),
             nipd: r.nipd,
-            nama: r.namaLengkap,
+            nama: r.nama,
             agama: r.agama,
             totalPoinHarian: r.totalPoinHarian,
           };
@@ -447,7 +478,7 @@ export const rekapRouter = createTRPCRouter({
         });
       }
 
-      // --- C. Sheet Log Pelanggaran (tanpa kolom Pelanggaran) ---
+      // --- C. Sheet Log Pelanggaran ---
       const wsPelanggaran = workbook.addWorksheet("Log Pelanggaran");
       wsPelanggaran.columns = [
         { header: "Tanggal", key: "tanggal", width: 15 },
@@ -483,7 +514,6 @@ export const rekapRouter = createTRPCRouter({
         });
       });
 
-      // 6. KONVERSI & RETURN
       const buffer = await workbook.xlsx.writeBuffer();
       return Buffer.from(buffer).toString("base64");
     }),

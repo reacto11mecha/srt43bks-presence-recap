@@ -196,7 +196,7 @@ export default function PengaturanPage() {
                           <TableHead>Waktu</TableHead>
                           <TableHead>Kewajiban</TableHead>
                           <TableHead>Target Jenjang</TableHead>
-                          <TableHead>Poin (Tepat / Telat)</TableHead>
+                          <TableHead>Poin (Tepat / Telat / Alfa)</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -223,7 +223,8 @@ export default function PengaturanPage() {
                               {sesi.targetJenjang.join(", ")}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
-                              +{sesi.poinTepatWaktu} / {sesi.poinTelat}
+                              +{sesi.poinTepatWaktu} / {sesi.poinTelat} /{" "}
+                              {sesi.poinAlfa}
                             </TableCell>
                             <TableCell className="text-right">
                               <SesiFormDialog

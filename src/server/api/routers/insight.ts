@@ -1,7 +1,7 @@
 // src/server/api/routers/insight.ts
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { and, eq, or, ne, isNotNull, desc, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, desc, sql } from "drizzle-orm";
 import {
   logAbsensi,
   pesertaDidik,
@@ -38,52 +38,110 @@ export const insightRouter = createTRPCRouter({
     }),
 
   // --------------------------------------------------------
-  // B. RADAR STATISTIK (Hadir, Telat, Alfa, Sakit/Izin)
+  // B. RADAR STATISTIK (Hadir, Telat, Alfa, Sakit/Izin, Lainnya)
   // --------------------------------------------------------
   getStatistikHarian: protectedProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
-      const stats = await ctx.db
+      // 1. Ambil peserta aktif sesuai filter
+      const pesertaList = await ctx.db
         .select({
-          // Menggunakan SQL murni untuk menghitung kondisi secara langsung di database
-          tepatWaktu:
-            sql<number>`SUM(CASE WHEN ${logAbsensi.statusKehadiran} = 'HADIR' AND ${logAbsensi.statusWaktu} = 'TEPAT_WAKTU' THEN 1 ELSE 0 END)`.mapWith(
-              Number,
-            ),
-          telat:
-            sql<number>`SUM(CASE WHEN ${logAbsensi.statusKehadiran} = 'HADIR' AND ${logAbsensi.statusWaktu} = 'TELAT' THEN 1 ELSE 0 END)`.mapWith(
-              Number,
-            ),
-          sakitIzin:
-            sql<number>`SUM(CASE WHEN ${logAbsensi.statusKehadiran} IN ('SAKIT', 'IZIN') THEN 1 ELSE 0 END)`.mapWith(
-              Number,
-            ),
-          alfa: sql<number>`SUM(CASE WHEN ${logAbsensi.statusKehadiran} IN ('ALFA', 'TIDAK_HADIR') THEN 1 ELSE 0 END)`.mapWith(
-            Number,
-          ),
-          totalAktivitas: sql<number>`COUNT(${logAbsensi.id})`.mapWith(Number),
+          id: pesertaDidik.id,
+          agama: pesertaDidik.agama,
         })
-        .from(logAbsensi)
-        .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
+        .from(pesertaDidik)
         .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
         .where(
           and(
-            eq(logAbsensi.tanggal, input.tanggal),
+            eq(pesertaDidik.status, "AKTIF"),
             eq(kelas.jenjang, input.jenjang),
             input.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
             input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
-            isNotNull(logAbsensi.sesiId), // Pastikan hanya menghitung kehadiran sesi rutin, bukan pelanggaran manual
           ),
         );
 
-      // Jika database kosong pada hari itu, pastikan mengembalikan nilai 0 agar UI tidak crash (NaN)
-      const result = stats[0];
+      // 2. Ambil sesi yang relevan (hanya wajib)
+      const sesiList = await ctx.db
+        .select({
+          id: sesiAbsensi.id,
+          targetJenjang: sesiAbsensi.targetJenjang,
+          targetAgama: sesiAbsensi.targetAgama,
+        })
+        .from(sesiAbsensi)
+        .where(
+          and(
+            eq(sesiAbsensi.isActive, true),
+            eq(sesiAbsensi.isMandatory, true),
+            sql`${sesiAbsensi.targetJenjang} && ARRAY[${input.jenjang}]::jenjang[]`,
+          ),
+        );
+
+      // 3. Hitung total slot (peserta * sesi yang agamanya cocok)
+      let totalSlot = 0;
+      const pasanganValid: { pesertaId: string; sesiId: string }[] = [];
+      for (const sesi of sesiList) {
+        for (const p of pesertaList) {
+          if (sesi.targetAgama.includes(p.agama)) {
+            totalSlot++;
+            pasanganValid.push({ pesertaId: p.id, sesiId: sesi.id });
+          }
+        }
+      }
+
+      // 4. Ambil log yang terkait dengan pasangan di atas (hanya yang ada log-nya)
+      const logs = await ctx.db
+        .select({
+          pesertaDidikId: logAbsensi.pesertaDidikId,
+          sesiId: logAbsensi.sesiId,
+          statusKehadiran: logAbsensi.statusKehadiran,
+          statusWaktu: logAbsensi.statusWaktu,
+        })
+        .from(logAbsensi)
+        .where(
+          and(
+            eq(logAbsensi.tanggal, input.tanggal),
+            inArray(
+              logAbsensi.pesertaDidikId,
+              pesertaList.map((p) => p.id),
+            ),
+            inArray(
+              logAbsensi.sesiId,
+              sesiList.map((s) => s.id),
+            ),
+          ),
+        );
+
+      // 5. Aggregate dari log
+      let tepatWaktu = 0,
+        telat = 0,
+        sakitIzinLainnya = 0;
+      for (const log of logs) {
+        if (
+          log.statusKehadiran === "HADIR" &&
+          log.statusWaktu === "TEPAT_WAKTU"
+        ) {
+          tepatWaktu++;
+        } else if (
+          log.statusKehadiran === "HADIR" &&
+          log.statusWaktu === "TELAT"
+        ) {
+          telat++;
+        } else if (["SAKIT", "IZIN", "LAINNYA"].includes(log.statusKehadiran)) {
+          sakitIzinLainnya++;
+        }
+        // Status ALFA/TIDAK_HADIR yang eksplisit juga akan diabaikan di sini,
+        // karena nanti akan masuk ke perhitungan alfa sebagai sisa.
+      }
+
+      // 6. Hitung alfa dari selisih
+      const alfa = totalSlot - (tepatWaktu + telat + sakitIzinLainnya);
+
       return {
-        tepatWaktu: result?.tepatWaktu || 0,
-        telat: result?.telat || 0,
-        sakitIzin: result?.sakitIzin || 0,
-        alfa: result?.alfa || 0,
-        totalAktivitas: result?.totalAktivitas || 0,
+        tepatWaktu,
+        telat,
+        sakitIzinLainnya,
+        alfa,
+        totalAktivitas: totalSlot,
       };
     }),
 
@@ -93,80 +151,149 @@ export const insightRouter = createTRPCRouter({
   getEvaluasiSesi: protectedProcedure
     .input(insightFilterSchema)
     .query(async ({ ctx, input }) => {
-      // 1. Ambil semua log yang bermasalah (Telat atau Tidak Hadir)
-      const logsBermasalah = await ctx.db
+      // Ambil semua peserta didik aktif sesuai filter
+      const pesertaList = await ctx.db
         .select({
-          logId: logAbsensi.id,
-          statusKehadiran: logAbsensi.statusKehadiran,
-          statusWaktu: logAbsensi.statusWaktu,
-          poinDidapat: logAbsensi.poinDidapat,
-          keterangan: logAbsensi.keterangan,
-          peserta: {
-            id: pesertaDidik.id,
-            namaLengkap: pesertaDidik.namaLengkap,
-          },
+          id: pesertaDidik.id,
+          namaLengkap: pesertaDidik.namaLengkap,
+          agama: pesertaDidik.agama,
           kelas: {
             tingkat: kelas.tingkat,
             namaKelas: kelas.namaKelas,
+            jenjang: kelas.jenjang,
           },
-          sesi: {
-            id: sesiAbsensi.id,
-            namaSesi: sesiAbsensi.namaSesi,
-            waktuMulai: sesiAbsensi.waktuMulai,
-          },
+        })
+        .from(pesertaDidik)
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .where(
+          and(
+            eq(pesertaDidik.status, "AKTIF"),
+            eq(kelas.jenjang, input.jenjang),
+            input.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
+            input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
+          ),
+        );
+
+      // Ambil semua sesi wajib yang relevan (targetJenjang overlap dengan input.jenjang)
+      const sesiList = await ctx.db
+        .select({
+          id: sesiAbsensi.id,
+          namaSesi: sesiAbsensi.namaSesi,
+          waktuMulai: sesiAbsensi.waktuMulai,
           kategori: {
             namaKategori: kategoriAbsensi.namaKategori,
           },
+          targetJenjang: sesiAbsensi.targetJenjang,
+          targetAgama: sesiAbsensi.targetAgama,
+          poinAlfa: sesiAbsensi.poinAlfa, // ← ambil poin alfa
         })
-        .from(logAbsensi)
-        .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
-        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
-        .innerJoin(sesiAbsensi, eq(logAbsensi.sesiId, sesiAbsensi.id))
+        .from(sesiAbsensi)
         .innerJoin(
           kategoriAbsensi,
           eq(sesiAbsensi.kategoriId, kategoriAbsensi.id),
         )
         .where(
           and(
+            eq(sesiAbsensi.isActive, true),
+            eq(sesiAbsensi.isMandatory, true), // ← hanya sesi wajib
+            sql`${sesiAbsensi.targetJenjang} && ARRAY[${input.jenjang}]::jenjang[]`,
+          ),
+        );
+
+      // Untuk setiap sesi, kita perlu mencocokkan dengan peserta yang memenuhi target
+      const grouped = sesiList.map((sesi) => {
+        const pesertaSesi = pesertaList.filter((p) =>
+          sesi.targetAgama.includes(p.agama),
+        );
+        return { sesi, pesertaSesi };
+      });
+
+      // Ambil logAbsensi untuk semua peserta-sesi pada tanggal tsb
+      const allLogs = await ctx.db
+        .select({
+          sesiId: logAbsensi.sesiId,
+          pesertaDidikId: logAbsensi.pesertaDidikId,
+          statusKehadiran: logAbsensi.statusKehadiran,
+          statusWaktu: logAbsensi.statusWaktu,
+          poinDidapat: logAbsensi.poinDidapat,
+          keterangan: logAbsensi.keterangan,
+          id: logAbsensi.id,
+        })
+        .from(logAbsensi)
+        .where(
+          and(
             eq(logAbsensi.tanggal, input.tanggal),
-            eq(kelas.jenjang, input.jenjang),
-            input.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
-            input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
-            // Hanya ambil yang bermasalah
-            or(
-              ne(logAbsensi.statusKehadiran, "HADIR"),
-              eq(logAbsensi.statusWaktu, "TELAT"),
+            inArray(
+              logAbsensi.sesiId,
+              sesiList.map((s) => s.id),
+            ),
+            inArray(
+              logAbsensi.pesertaDidikId,
+              pesertaList.map((p) => p.id),
             ),
           ),
-        )
-        .orderBy(sesiAbsensi.waktuMulai, pesertaDidik.namaLengkap);
+        );
 
-      // 2. Format data ke bentuk Grouping by Sesi agar mudah diloop di Accordion Frontend
-      const groupedData = logsBermasalah.reduce(
-        (acc, curr) => {
-          const sesiKey = curr.sesi.id;
-          if (!acc[sesiKey]) {
-            acc[sesiKey] = {
-              sesiDetail: curr.sesi,
-              kategoriDetail: curr.kategori,
-              siswaBermasalah: [],
-            };
+      // Struktur hasil: per sesi, siswa bermasalah
+      const hasilAkhir = grouped
+        .map(({ sesi, pesertaSesi }) => {
+          const siswaBermasalah: any[] = [];
+
+          for (const peserta of pesertaSesi) {
+            const log = allLogs.find(
+              (l) => l.sesiId === sesi.id && l.pesertaDidikId === peserta.id,
+            );
+
+            let statusKehadiran = log?.statusKehadiran ?? "ALFA";
+            let statusWaktu = log?.statusWaktu;
+            let poin: number;
+            let isMasalah = false;
+
+            if (!log) {
+              // Tidak ada log → alfa dengan poinAlfa sesi
+              isMasalah = true;
+              statusKehadiran = "ALFA";
+              poin = sesi.poinAlfa;
+            } else {
+              // Gunakan poin dari log (sudah sesuai, termasuk poinAlfa jika statusnya ALFA/TIDAK_HADIR)
+              poin = log.poinDidapat;
+              if (
+                log.statusKehadiran !== "HADIR" ||
+                log.statusWaktu === "TELAT"
+              ) {
+                isMasalah = true;
+              }
+            }
+
+            if (isMasalah) {
+              siswaBermasalah.push({
+                logId: log?.id ?? `missing-${peserta.id}-${sesi.id}`,
+                peserta: {
+                  id: peserta.id,
+                  namaLengkap: peserta.namaLengkap,
+                },
+                kelas: peserta.kelas,
+                statusKehadiran,
+                statusWaktu,
+                poinDidapat: poin,
+                keterangan: log?.keterangan ?? "Tidak melakukan absensi",
+              });
+            }
           }
-          acc[sesiKey].siswaBermasalah.push({
-            logId: curr.logId,
-            peserta: curr.peserta,
-            kelas: curr.kelas,
-            statusKehadiran: curr.statusKehadiran,
-            statusWaktu: curr.statusWaktu,
-            poinDidapat: curr.poinDidapat,
-            keterangan: curr.keterangan,
-          });
-          return acc;
-        },
-        {} as Record<string, any>,
-      );
 
-      return Object.values(groupedData);
+          return {
+            sesiDetail: {
+              id: sesi.id,
+              namaSesi: sesi.namaSesi,
+              waktuMulai: sesi.waktuMulai,
+            },
+            kategoriDetail: sesi.kategori,
+            siswaBermasalah,
+          };
+        })
+        .filter((grup) => grup.siswaBermasalah.length > 0);
+
+      return hasilAkhir;
     }),
 
   // --------------------------------------------------------
@@ -206,7 +333,7 @@ export const insightRouter = createTRPCRouter({
             eq(kelas.jenjang, input.jenjang),
             input.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
             input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
-            isNotNull(logAbsensi.pelanggaranId), // Pastikan ini adalah log pelanggaran
+            isNotNull(logAbsensi.pelanggaranId),
           ),
         )
         .orderBy(desc(logAbsensi.waktuScan));
@@ -224,7 +351,6 @@ export const insightRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Agregasi poin per siswa (SUM) khusus untuk hari ini
       const topStudents = await ctx.db
         .select({
           pesertaId: pesertaDidik.id,

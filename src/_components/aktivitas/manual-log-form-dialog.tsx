@@ -41,6 +41,7 @@ const statusMap: Record<string, string> = {
   SAKIT: "Sakit",
   IZIN: "Izin",
   ALFA: "Alfa (Tanpa Keterangan)",
+  LAINNYA: "Lain-lainnya",
 };
 
 const formSchema = z
@@ -50,7 +51,14 @@ const formSchema = z
     kategoriId: z.string().optional(),
     sesiId: z.string().optional(),
     pelanggaranId: z.string().optional(),
-    statusKehadiran: z.enum(["HADIR", "TIDAK_HADIR", "IZIN", "SAKIT", "ALFA"]),
+    statusKehadiran: z.enum([
+      "HADIR",
+      "TIDAK_HADIR",
+      "IZIN",
+      "SAKIT",
+      "ALFA",
+      "LAINNYA",
+    ]),
     keterangan: z.string().optional(),
     tanggal: z.string().min(1, "Tanggal wajib diisi"),
     poinOverride: z.string().optional(),
@@ -72,6 +80,18 @@ const formSchema = z
         message: "Jenis pelanggaran wajib dipilih",
         path: ["pelanggaranId"],
       });
+    }
+    if (
+      data.tipeLog === "SESI" &&
+      ["IZIN", "LAINNYA"].includes(data.statusKehadiran)
+    ) {
+      if (!data.keterangan || data.keterangan.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Keterangan wajib diisi untuk status Izin atau Lain-lainnya",
+          path: ["keterangan"],
+        });
+      }
     }
   });
 
@@ -105,6 +125,10 @@ export function ManualLogFormDialog() {
   const selectedPelanggaranId = form.watch("pelanggaranId");
   const selectedPesertaDidikId = form.watch("pesertaDidikId");
   const selectedStatus = form.watch("statusKehadiran");
+
+  const isKeteranganWajib =
+    tipeLog === "SESI" &&
+    (selectedStatus === "IZIN" || selectedStatus === "LAINNYA");
 
   const selectedKategori = options?.kategori.find(
     (k) => k.id === selectedKategoriId,
@@ -539,11 +563,20 @@ export function ManualLogFormDialog() {
                         <Field data-invalid={fieldState.invalid}>
                           <FieldLabel htmlFor={field.name}>
                             Keterangan / Kronologi
+                            {/* Bintang merah dinamis muncul jika wajib */}
+                            {isKeteranganWajib && (
+                              <span className="ml-1 text-red-500">*</span>
+                            )}
                           </FieldLabel>
                           <Textarea
                             {...field}
                             id={field.name}
-                            placeholder="Tulis alasan izin, sakit, atau kronologi pelanggaran secara detail di sini..."
+                            // Placeholder dinamis
+                            placeholder={
+                              isKeteranganWajib
+                                ? "Wajib diisi dengan alasan izin atau keterangan spesifik..."
+                                : "Tulis alasan sakit atau kronologi pelanggaran secara detail di sini..."
+                            }
                             aria-invalid={fieldState.invalid}
                             className="bg-muted/10 h-32 w-full resize-none"
                           />

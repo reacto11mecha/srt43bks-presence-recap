@@ -50,6 +50,7 @@ const formSchema = z.object({
     .min(1, "Pilih minimal 1 agama"),
   poinTepatWaktu: z.coerce.number(),
   poinTelat: z.coerce.number(),
+  poinAlfa: z.coerce.number(),
   isActive: z.boolean(),
 });
 
@@ -92,6 +93,7 @@ export function SesiFormDialog({
         : [...AGAMA_OPTIONS],
       poinTepatWaktu: initialData?.poinTepatWaktu || 0,
       poinTelat: initialData?.poinTelat || 0,
+      poinAlfa: initialData?.poinAlfa || -20, // default -20
       isActive: initialData?.isActive ?? true,
     },
   });
@@ -356,6 +358,33 @@ export function SesiFormDialog({
               )}
             />
           </div>
+
+          {/* Poin Alfa (Tambahan) */}
+          <Controller
+            name="poinAlfa"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name}>
+                  Poin Alfa (Tidak Hadir)
+                </FieldLabel>
+                <Input
+                  id={field.name}
+                  type="number"
+                  {...field}
+                  placeholder="-20"
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldDescription>
+                  Poin yang diberikan jika peserta tidak hadir (alfa). Biasanya
+                  lebih berat dari telat.
+                </FieldDescription>
+                {fieldState.invalid && (
+                  <FieldError errors={[fieldState.error]} />
+                )}
+              </Field>
+            )}
+          />
 
           {/* Checkbox Boolean */}
           <Controller

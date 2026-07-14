@@ -135,6 +135,7 @@ export const pengaturanRouter = createTRPCRouter({
           .min(1, "Pilih minimal 1 agama"),
         poinTepatWaktu: z.number(),
         poinTelat: z.number(),
+        poinAlfa: z.number(),
         isActive: z.boolean().default(true),
       }),
     )
@@ -149,6 +150,7 @@ export const pengaturanRouter = createTRPCRouter({
         targetAgama: input.targetAgama,
         poinTepatWaktu: input.poinTepatWaktu,
         poinTelat: input.poinTelat,
+        poinAlfa: input.poinAlfa,
         isActive: input.isActive,
       });
     }),
@@ -179,6 +181,7 @@ export const pengaturanRouter = createTRPCRouter({
           .min(1, "Pilih minimal 1 agama"),
         poinTepatWaktu: z.number(),
         poinTelat: z.number(),
+        poinAlfa: z.number(),
         isActive: z.boolean(),
       }),
     )
@@ -194,6 +197,7 @@ export const pengaturanRouter = createTRPCRouter({
           targetAgama: input.targetAgama,
           poinTepatWaktu: input.poinTepatWaktu,
           poinTelat: input.poinTelat,
+          poinAlfa: input.poinAlfa,
           isActive: input.isActive,
         })
         .where(eq(sesiAbsensi.id, input.id));

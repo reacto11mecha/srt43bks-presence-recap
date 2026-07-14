@@ -123,8 +123,18 @@ async function main() {
       "KONGHUCU",
       "LAINNYA",
     ] as typeof islamOnly;
+    const semuaAgama = [
+      "ISLAM",
+      "KRISTEN",
+      "KATOLIK",
+      "HINDU",
+      "BUDHA",
+      "KONGHUCU",
+      "LAINNYA",
+    ] as typeof islamOnly;
 
     const dataSesi = [
+      // --- SHOLAT (Islam only) ---
       {
         id: crypto.randomUUID(),
         kategoriId: katSolatId,
@@ -136,8 +146,8 @@ async function main() {
         targetAgama: islamOnly,
         poinTepatWaktu: 25,
         poinTelat: -10,
+        poinAlfa: -25, // lebih berat dari telat
       },
-      // ... (semua sesi solat lainnya ditambahkan targetAgama: islamOnly)
       {
         id: crypto.randomUUID(),
         kategoriId: katSolatId,
@@ -149,6 +159,7 @@ async function main() {
         targetAgama: islamOnly,
         poinTepatWaktu: 15,
         poinTelat: -5,
+        poinAlfa: -15,
       },
       {
         id: crypto.randomUUID(),
@@ -161,6 +172,7 @@ async function main() {
         targetAgama: islamOnly,
         poinTepatWaktu: 15,
         poinTelat: -5,
+        poinAlfa: -15,
       },
       {
         id: crypto.randomUUID(),
@@ -173,6 +185,7 @@ async function main() {
         targetAgama: islamOnly,
         poinTepatWaktu: 15,
         poinTelat: -5,
+        poinAlfa: -15,
       },
       {
         id: crypto.randomUUID(),
@@ -185,6 +198,7 @@ async function main() {
         targetAgama: islamOnly,
         poinTepatWaktu: 15,
         poinTelat: -5,
+        poinAlfa: -15,
       },
       {
         id: crypto.randomUUID(),
@@ -197,9 +211,10 @@ async function main() {
         targetAgama: islamOnly,
         poinTepatWaktu: 15,
         poinTelat: -5,
+        poinAlfa: -15,
       },
 
-      // --- TAMBAHAN: IBADAH NON-ISLAM (sekali sehari) ---
+      // --- IBADAH NON-ISLAM (non-Islam only) ---
       {
         id: crypto.randomUUID(),
         kategoriId: katIbadahNonIslamId,
@@ -211,9 +226,10 @@ async function main() {
         targetAgama: nonIslam,
         poinTepatWaktu: 30,
         poinTelat: -10,
+        poinAlfa: -25,
       },
 
-      // --- KELOMPOK: ABSEN MAKAN (Wajib: Telat = Minus) ---
+      // --- MAKAN (semua agama) ---
       {
         id: crypto.randomUUID(),
         kategoriId: katMakanId,
@@ -222,8 +238,10 @@ async function main() {
         waktuSelesai: "06:15:00",
         isMandatory: true,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 30,
         poinTelat: -10,
+        poinAlfa: -20,
       },
       {
         id: crypto.randomUUID(),
@@ -233,8 +251,10 @@ async function main() {
         waktuSelesai: "14:00:00",
         isMandatory: true,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 30,
         poinTelat: -10,
+        poinAlfa: -20,
       },
       {
         id: crypto.randomUUID(),
@@ -244,11 +264,13 @@ async function main() {
         waktuSelesai: "19:15:00",
         isMandatory: true,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 30,
         poinTelat: -10,
+        poinAlfa: -20,
       },
 
-      // --- KELOMPOK: ABSEN KEGIATAN (Wajib: Telat = Minus) ---
+      // --- KEGIATAN (semua agama) ---
       {
         id: crypto.randomUUID(),
         kategoriId: katKegiatanId,
@@ -257,8 +279,10 @@ async function main() {
         waktuSelesai: "06:45:00",
         isMandatory: true,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 20,
         poinTelat: -10,
+        poinAlfa: -20,
       },
       {
         id: crypto.randomUUID(),
@@ -268,8 +292,10 @@ async function main() {
         waktuSelesai: "14:30:00",
         isMandatory: true,
         targetJenjang: ["SD"] as ("SD" | "SMP" | "SMA")[],
+        targetAgama: semuaAgama,
         poinTepatWaktu: 20,
         poinTelat: -10,
+        poinAlfa: -20,
       },
       {
         id: crypto.randomUUID(),
@@ -279,8 +305,10 @@ async function main() {
         waktuSelesai: "16:30:00",
         isMandatory: true,
         targetJenjang: ["SMP", "SMA"] as ("SD" | "SMP" | "SMA")[],
+        targetAgama: semuaAgama,
         poinTepatWaktu: 20,
         poinTelat: -10,
+        poinAlfa: -20,
       },
       {
         id: crypto.randomUUID(),
@@ -290,8 +318,10 @@ async function main() {
         waktuSelesai: "21:00:00",
         isMandatory: true,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 25,
         poinTelat: -15,
+        poinAlfa: -30,
       },
       {
         id: crypto.randomUUID(),
@@ -301,11 +331,13 @@ async function main() {
         waktuSelesai: "22:00:00",
         isMandatory: true,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 85,
         poinTelat: -50,
+        poinAlfa: -100, // konsekuensi berat untuk ketidakhadiran tidur
       },
 
-      // --- KELOMPOK: KEGIATAN LAINNYA (Tidak Wajib) ---
+      // --- TAMBAHAN NON-MANDATORY (semua agama) ---
       {
         id: crypto.randomUUID(),
         kategoriId: katKegiatanId,
@@ -314,8 +346,10 @@ async function main() {
         waktuSelesai: null,
         isMandatory: false,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 10,
         poinTelat: 0,
+        poinAlfa: 0, // tidak ada poin minus karena opsional
       },
       {
         id: crypto.randomUUID(),
@@ -325,8 +359,10 @@ async function main() {
         waktuSelesai: null,
         isMandatory: false,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 10,
         poinTelat: 0,
+        poinAlfa: 0,
       },
       {
         id: crypto.randomUUID(),
@@ -336,8 +372,10 @@ async function main() {
         waktuSelesai: null,
         isMandatory: false,
         targetJenjang: semuaJenjang,
+        targetAgama: semuaAgama,
         poinTepatWaktu: 10,
         poinTelat: 0,
+        poinAlfa: 0,
       },
     ];
 
@@ -346,7 +384,31 @@ async function main() {
 
     if (isFull) {
       // ==========================================
-      // 4. SEEDING KELAS
+      // 4. INPUT BESARAN DATA
+      // ==========================================
+      let jmlPesertaPerKelas = 0;
+      let jmlHari = 7;
+
+      const jmlInput = await askQuestion(
+        "Jumlah peserta per kelas (default acak 5-8, ketik angka atau kosongkan): ",
+      );
+      if (jmlInput.trim() !== "") {
+        const n = parseInt(jmlInput);
+        if (!isNaN(n) && n > 0) jmlPesertaPerKelas = n;
+        else console.log("Input tidak valid, akan menggunakan acak 5-8.");
+      }
+
+      const hariInput = await askQuestion(
+        "Jumlah hari ke belakang untuk log absensi (default 7): ",
+      );
+      if (hariInput.trim() !== "") {
+        const n = parseInt(hariInput);
+        if (!isNaN(n) && n > 0) jmlHari = n;
+        else console.log("Input tidak valid, akan menggunakan 7 hari.");
+      }
+
+      // ==========================================
+      // 5. SEEDING KELAS
       // ==========================================
       console.log("Mempersiapkan data Kelas...");
       const kelasList: Array<{
@@ -389,14 +451,13 @@ async function main() {
       const allKelas = await db.select().from(kelas);
 
       // ==========================================
-      // 5. SEEDING PESERTA DIDIK
+      // 6. SEEDING PESERTA DIDIK
       // ==========================================
       console.log("Mempersiapkan data Peserta Didik...");
 
       const randomEl = <T>(arr: T[]): T =>
         arr[Math.floor(Math.random() * arr.length)];
 
-      // Fungsi distribusi agama (sama seperti sebelumnya)
       const getRandomAgama = () => {
         const r = Math.random();
         if (r < 0.6) return "ISLAM";
@@ -409,24 +470,25 @@ async function main() {
       };
 
       const pesertaDummy: (typeof pesertaDidik.$inferInsert)[] = [];
-      let counter = 0; // untuk generate NIPD urut
+      let counter = 0;
 
       allKelas.forEach((kls) => {
-        const jumlahSiswa = 5 + Math.floor(Math.random() * 4); // 5-8
-        for (let i = 0; i < jumlahSiswa; i++) {
+        const jumlah =
+          jmlPesertaPerKelas > 0
+            ? jmlPesertaPerKelas
+            : 5 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < jumlah; i++) {
           const isMale = Math.random() > 0.5;
-          // Generate nama lengkap Indonesia dengan gender sesuai
           const namaLengkap = faker.person.fullName({
             sex: isMale ? "male" : "female",
           });
           const nipd = `PD${String(counter + 1).padStart(5, "0")}`;
           const agama = getRandomAgama();
 
-          // Generate tanggal lahir yang sesuai dengan tingkat kelas
           const tahunLahir =
             2008 - Number(kls.tingkat) - Math.floor(Math.random() * 3);
           const bulan = Math.floor(Math.random() * 12);
-          const hari = Math.floor(Math.random() * 28) + 1; // hindari 29/30/31 agar sederhana
+          const hari = Math.floor(Math.random() * 28) + 1;
           const tanggalLahir = `${tahunLahir}-${String(bulan + 1).padStart(2, "0")}-${String(hari).padStart(2, "0")}`;
 
           pesertaDummy.push({
@@ -436,7 +498,7 @@ async function main() {
             nisn: `${new Date().getFullYear()}${String(counter + 1).padStart(6, "0")}`,
             namaLengkap,
             jenisKelamin: isMale ? "L" : "P",
-            tempatLahir: faker.location.city(), // kota acak Indonesia
+            tempatLahir: faker.location.city(),
             tanggalLahir,
             agama,
             alamat: faker.location.streetAddress(),
@@ -453,7 +515,7 @@ async function main() {
       console.log(`Total peserta: ${allPeserta.length}`);
 
       // ==========================================
-      // 6. SEEDING LOG ABSENSI (7 hari terakhir) - DENGAN CHUNKING
+      // 7. SEEDING LOG ABSENSI (dengan bolong & LAINNYA)
       // ==========================================
       console.log("Mempersiapkan data Log Absensi...");
       const allSesi = await db.select().from(sesiAbsensi);
@@ -461,7 +523,7 @@ async function main() {
 
       const today = new Date();
       const tanggalList: string[] = [];
-      for (let i = 6; i >= 0; i--) {
+      for (let i = jmlHari - 1; i >= 0; i--) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         tanggalList.push(d.toISOString().split("T")[0]);
@@ -469,30 +531,42 @@ async function main() {
 
       const comboSet = new Set<string>();
       const logDummy: (typeof logAbsensi.$inferInsert)[] = [];
+      const PROB_MISSING = 0.1; // 10% data bolong
+      const PROB_HADIR = 0.75;
+      const PROB_IZIN = 0.05;
+      const PROB_SAKIT = 0.05;
+      const PROB_ALFA = 0.05;
+      const PROB_LAINNYA = 0.05; // sisanya TIDAK_HADIR
 
       allPeserta.forEach((peserta) => {
         const kls = allKelas.find((k) => k.id === peserta.kelasId);
         if (!kls) return;
-        // Filter sesi berdasarkan jenjang DAN agama peserta
         const sesiRelevan = allSesi.filter(
           (s) =>
             s.targetJenjang.includes(kls.jenjang) &&
-            s.targetAgama.includes(peserta.agama), // <-- penambahan filter agama
+            s.targetAgama.includes(peserta.agama),
         );
 
-        // Absensi rutin per hari per sesi
         tanggalList.forEach((tgl) => {
           sesiRelevan.forEach((sesi) => {
             const key = `${tgl}||${sesi.id}||${peserta.id}`;
             if (comboSet.has(key)) return;
 
+            // Probabilitas bolong (tidak dibuat log)
+            if (Math.random() < PROB_MISSING) {
+              // Lewati, tidak ada log
+              return;
+            }
+
+            // Tentukan status
             const rand = Math.random();
-            let statusKehadiran:
-              "HADIR" | "TIDAK_HADIR" | "IZIN" | "SAKIT" | "ALFA" = "HADIR";
+            let statusKehadiran: typeof logAbsensi.$inferInsert.statusKehadiran =
+              "HADIR";
             let statusWaktu: "TEPAT_WAKTU" | "TELAT" | null = null;
             let poin = 0;
+            let keterangan: string | null = null;
 
-            if (rand < 0.75) {
+            if (rand < PROB_HADIR) {
               statusKehadiran = "HADIR";
               if (Math.random() < 0.7) {
                 statusWaktu = "TEPAT_WAKTU";
@@ -501,12 +575,24 @@ async function main() {
                 statusWaktu = "TELAT";
                 poin = sesi.poinTelat;
               }
-            } else if (rand < 0.85) {
+            } else if (rand < PROB_HADIR + PROB_IZIN) {
               statusKehadiran = "IZIN";
-            } else if (rand < 0.92) {
+              keterangan = "Izin orang tua";
+            } else if (rand < PROB_HADIR + PROB_IZIN + PROB_SAKIT) {
               statusKehadiran = "SAKIT";
-            } else {
+              keterangan = "Surat dokter";
+            } else if (rand < PROB_HADIR + PROB_IZIN + PROB_SAKIT + PROB_ALFA) {
               statusKehadiran = "ALFA";
+              poin = sesi.poinAlfa; // <-- gunakan poinAlfa
+            } else if (
+              rand <
+              PROB_HADIR + PROB_IZIN + PROB_SAKIT + PROB_ALFA + PROB_LAINNYA
+            ) {
+              statusKehadiran = "LAINNYA";
+              keterangan = "Lainnya";
+            } else {
+              statusKehadiran = "TIDAK_HADIR";
+              poin = sesi.poinAlfa;
             }
 
             const jamMulai = sesi.waktuMulai
@@ -527,17 +613,12 @@ async function main() {
               sesiId: sesi.id,
               pelanggaranId: null,
               tanggal: tgl,
-              waktuScan: waktuScan,
+              waktuScan,
               statusKehadiran,
               statusWaktu,
               isPoinManual: false,
               poinDidapat: poin,
-              keterangan:
-                statusKehadiran === "IZIN"
-                  ? "Izin orang tua"
-                  : statusKehadiran === "SAKIT"
-                    ? "Surat dokter"
-                    : null,
+              keterangan,
             });
             comboSet.add(key);
           });
@@ -548,8 +629,9 @@ async function main() {
           const pelanggaranAcak = randomEl(allPelanggaran);
           const tglAcak = randomEl(tanggalList);
           const jam = 8 + Math.floor(Math.random() * 12);
+          const menit = Math.floor(Math.random() * 60);
           const waktu = new Date(
-            `${tglAcak}T${String(jam).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}:00`,
+            `${tglAcak}T${String(jam).padStart(2, "0")}:${String(menit).padStart(2, "0")}:00`,
           );
           logDummy.push({
             id: crypto.randomUUID(),
@@ -570,7 +652,6 @@ async function main() {
 
       console.log(`Total entri log yang akan dimasukkan: ${logDummy.length}`);
 
-      // INSERT SECARA BERTAHAP (CHUNK 200)
       const CHUNK_SIZE = 200;
       for (let i = 0; i < logDummy.length; i += CHUNK_SIZE) {
         const chunk = logDummy.slice(i, i + CHUNK_SIZE);

@@ -36,11 +36,16 @@ import {
   Medal,
 } from "lucide-react";
 
-const getStatusBadge = (status: string) => {
+const getStatusBadge = (status: string, isMissing?: boolean) => {
+  if (isMissing)
+    return (
+      <Badge variant="destructive" className="gap-1">
+        <AlertTriangle className="h-3 w-3" /> BELUM ABSEN
+      </Badge>
+    );
+
   switch (status) {
     case "HADIR":
-      // Sebenarnya HADIR tidak mungkin tampil di sini kecuali TELAT,
-      // tapi kita tampilkan TELAT dengan warna amber
       return (
         <Badge
           variant="outline"
@@ -65,6 +70,15 @@ const getStatusBadge = (status: string) => {
           className="border-orange-300 bg-orange-50 text-orange-600"
         >
           SAKIT
+        </Badge>
+      );
+    case "LAINNYA": // ---> TAMBAHAN BARU
+      return (
+        <Badge
+          variant="outline"
+          className="border-purple-300 bg-purple-50 text-purple-600"
+        >
+          LAIN-LAIN
         </Badge>
       );
     case "ALFA":
@@ -123,8 +137,10 @@ export default function DashboardInsightPage() {
     total > 0 ? Math.round((stats!.tepatWaktu / total) * 100) : 0;
   const persenTelat = total > 0 ? Math.round((stats!.telat / total) * 100) : 0;
   const persenAlfa = total > 0 ? Math.round((stats!.alfa / total) * 100) : 0;
-  const persenSakit =
-    total > 0 ? Math.round((stats!.sakitIzin / total) * 100) : 0;
+
+  // ---> UBAH NAMA VARIABEL DAN PROPERTI OBJEK STATS
+  const persenSakitIzinLainnya =
+    total > 0 ? Math.round((stats!.sakitIzinLainnya / total) * 100) : 0;
 
   return (
     <div className="space-y-8 pb-10">
@@ -233,9 +249,9 @@ export default function DashboardInsightPage() {
                   title="Telat"
                 ></div>
                 <div
-                  style={{ width: `${persenSakit}%` }}
+                  style={{ width: `${persenSakitIzinLainnya}%` }} // ---> DIUBAH
                   className="bg-blue-400 transition-all duration-500"
-                  title="Sakit/Izin"
+                  title="Sakit/Izin/Lainnya"
                 ></div>
                 <div
                   style={{ width: `${persenAlfa}%` }}
@@ -268,14 +284,15 @@ export default function DashboardInsightPage() {
                     </span>
                   </p>
                 </div>
+                {/* ---> KOTAK LEGENDA SAKIT/IZIN DIUBAH */}
                 <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
                   <p className="mb-1 text-sm font-medium text-blue-700">
-                    Sakit / Izin
+                    Sakit/Izin/Lainnya
                   </p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {persenSakit}%{" "}
+                    {persenSakitIzinLainnya}%{" "}
                     <span className="text-xs font-normal">
-                      ({stats?.sakitIzin})
+                      ({stats?.sakitIzinLainnya})
                     </span>
                   </p>
                 </div>
@@ -368,7 +385,9 @@ export default function DashboardInsightPage() {
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                              {getStatusBadge(siswa.statusKehadiran)}
+                              {siswa.logId.startsWith("missing-")
+                                ? getStatusBadge("ALFA", true)
+                                : getStatusBadge(siswa.statusKehadiran)}
                               <span
                                 className={`font-mono text-xs font-bold ${siswa.poinDidapat < 0 ? "text-red-500" : "text-gray-700"}`}
                               >
