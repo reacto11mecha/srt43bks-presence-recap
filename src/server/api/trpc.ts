@@ -10,9 +10,11 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { and, eq, isNotNull } from "drizzle-orm";
 
 import { auth } from "~/server/better-auth";
 import { db } from "~/server/db";
+import { user, masterJabatan } from "~/server/db/schema";
 
 /**
  * 1. CONTEXT
@@ -121,10 +123,57 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  */
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
-  .use(({ ctx, next }) => {
+  .use(async ({ ctx, next }) => {
     if (!ctx.session?.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+
+    const currentUserApprovedAndHaveRole = await ctx.db
+      .select()
+      .from(user)
+      .where(
+        and(
+          eq(user.id, ctx.session.user.id),
+          isNotNull(user.jabatanId),
+          eq(user.accountApproved, true),
+        ),
+      );
+
+    if (currentUserApprovedAndHaveRole.length < 1)
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Akun anda belum terverifikasi.",
+      });
+
+    return next({
+      ctx: {
+        // infers the `session` as non-nullable
+        session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  });
+
+export const adminProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(async ({ ctx, next }) => {
+    if (!ctx.session?.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const currentUserIsAdmin = await ctx.db
+      .select()
+      .from(user)
+      .innerJoin(masterJabatan, eq(user.jabatanId, masterJabatan.id))
+      .where(
+        and(eq(user.id, ctx.session.user.id), eq(masterJabatan.role, "ADMIN")),
+      );
+
+    if (currentUserIsAdmin.length < 1)
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Anda bukan admin.",
+      });
+
     return next({
       ctx: {
         // infers the `session` as non-nullable

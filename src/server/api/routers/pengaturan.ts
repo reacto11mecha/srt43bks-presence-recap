@@ -1,6 +1,6 @@
 // src/server/api/routers/pengaturan.ts
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import {
   user,
   kategoriAbsensi,
@@ -25,13 +25,13 @@ export const pengaturanRouter = createTRPCRouter({
   // ====================================================================
   // A. KELOLA MASTER JABATAN (ROLE & LABEL)
   // ====================================================================
-  getJabatans: protectedProcedure.query(async ({ ctx }) => {
+  getJabatans: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.masterJabatan.findMany({
       orderBy: (j, { asc }) => [asc(j.namaJabatan)],
     });
   }),
 
-  createJabatan: protectedProcedure
+  createJabatan: adminProcedure
     .input(
       z.object({
         namaJabatan: z.string().min(1, "Nama Jabatan wajib diisi"),
@@ -45,7 +45,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updateJabatan: protectedProcedure
+  updateJabatan: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -65,7 +65,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(masterJabatan.id, input.id));
     }),
 
-  deleteJabatan: protectedProcedure
+  deleteJabatan: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(masterJabatan).where(eq(masterJabatan.id, input.id));
@@ -76,7 +76,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ====================================================================
 
   // 1. Ambil daftar pegawai yang baru login dan menunggu di-approve
-  getPendingUsers: protectedProcedure.query(async ({ ctx }) => {
+  getPendingUsers: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.user.findMany({
       where: eq(user.accountApproved, false),
       orderBy: (u, { desc }) => [desc(u.createdAt)],
@@ -84,7 +84,7 @@ export const pengaturanRouter = createTRPCRouter({
   }),
 
   // 2. Ambil daftar pegawai yang sudah di-approve (beserta nama jabatannya)
-  getApprovedUsers: protectedProcedure.query(async ({ ctx }) => {
+  getApprovedUsers: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.user.findMany({
       where: and(
         eq(user.accountApproved, true),
@@ -98,7 +98,7 @@ export const pengaturanRouter = createTRPCRouter({
   }),
 
   // 3. Approve pegawai baru (Berikan akses masuk & pasangkan jabatannya)
-  approveUser: protectedProcedure
+  approveUser: adminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -116,7 +116,7 @@ export const pengaturanRouter = createTRPCRouter({
     }),
 
   // 4. Tolak/Hapus pegawai yang tidak dikenal
-  rejectUser: protectedProcedure
+  rejectUser: adminProcedure
     .input(z.object({ userId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Hapus permanen user dari database agar tidak membebani sistem
@@ -124,7 +124,7 @@ export const pengaturanRouter = createTRPCRouter({
     }),
 
   // 5. Update/Pindahkan jabatan pegawai yang sudah aktif
-  updateUserJabatan: protectedProcedure
+  updateUserJabatan: adminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -141,7 +141,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // READ DATA (Untuk ditampilkan di tabel Pengaturan)
   // ==========================================
-  getKategoriWithSesi: protectedProcedure.query(async ({ ctx }) => {
+  getKategoriWithSesi: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.kategoriAbsensi.findMany({
       with: {
         sesi: {
@@ -152,7 +152,7 @@ export const pengaturanRouter = createTRPCRouter({
     });
   }),
 
-  getMasterPelanggaran: protectedProcedure.query(async ({ ctx }) => {
+  getMasterPelanggaran: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.masterPelanggaran.findMany({
       orderBy: [
         asc(masterPelanggaran.tingkat),
@@ -164,7 +164,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // CRUD KATEGORI ABSENSI (Induk)
   // ==========================================
-  createKategori: protectedProcedure
+  createKategori: adminProcedure
     .input(
       z.object({
         namaKategori: z.string().min(1, "Nama Kategori wajib diisi"),
@@ -178,7 +178,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updateKategori: protectedProcedure
+  updateKategori: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -196,7 +196,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(kategoriAbsensi.id, input.id));
     }),
 
-  deleteKategori: protectedProcedure
+  deleteKategori: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
@@ -207,7 +207,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // CRUD SESI ABSENSI (Anak dari Kategori)
   // ==========================================
-  createSesi: protectedProcedure
+  createSesi: adminProcedure
     .input(
       z.object({
         kategoriId: z.string(),
@@ -253,7 +253,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updateSesi: protectedProcedure
+  updateSesi: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -301,7 +301,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(sesiAbsensi.id, input.id));
     }),
 
-  deleteSesi: protectedProcedure
+  deleteSesi: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.delete(sesiAbsensi).where(eq(sesiAbsensi.id, input.id));
@@ -310,7 +310,7 @@ export const pengaturanRouter = createTRPCRouter({
   // ==========================================
   // CRUD MASTER PELANGGARAN
   // ==========================================
-  createPelanggaran: protectedProcedure
+  createPelanggaran: adminProcedure
     .input(
       z.object({
         namaPelanggaran: z.string().min(1, "Nama Pelanggaran wajib diisi"),
@@ -328,7 +328,7 @@ export const pengaturanRouter = createTRPCRouter({
       });
     }),
 
-  updatePelanggaran: protectedProcedure
+  updatePelanggaran: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -350,7 +350,7 @@ export const pengaturanRouter = createTRPCRouter({
         .where(eq(masterPelanggaran.id, input.id));
     }),
 
-  deletePelanggaran: protectedProcedure
+  deletePelanggaran: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db

@@ -1,5 +1,5 @@
 // src/server/api/routers/peserta.ts
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import { eq, desc, asc, and } from "drizzle-orm";
 import { pesertaDidik, kelas, user } from "~/server/db/schema";
 import JSZip from "jszip";
@@ -58,7 +58,7 @@ const insertPesertaSchema = z.object({
 export type InsertPesertaType = z.infer<typeof insertPesertaSchema>;
 
 export const pesertaRouter = createTRPCRouter({
-  getAll: protectedProcedure.query(async ({ ctx }) => {
+  getAll: adminProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.pesertaDidik.findMany({
       with: {
         kelas: true,
@@ -68,7 +68,7 @@ export const pesertaRouter = createTRPCRouter({
     });
   }),
 
-  assignWaliAsuh: protectedProcedure
+  assignWaliAsuh: adminProcedure
     .input(
       z.object({
         pesertaId: z.string(),
@@ -82,14 +82,14 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(pesertaDidik.id, input.pesertaId));
     }),
 
-  getWaliAsuh: protectedProcedure.query(async ({ ctx }) => {
+  getWaliAsuh: adminProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.user.findMany({
       columns: { id: true, name: true, email: true, image: true },
       orderBy: [asc(user.name)],
     });
   }),
 
-  createPeserta: protectedProcedure
+  createPeserta: adminProcedure
     .input(insertPesertaSchema)
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.query.pesertaDidik.findFirst({
@@ -121,7 +121,7 @@ export const pesertaRouter = createTRPCRouter({
       });
     }),
 
-  createBanyakPeserta: protectedProcedure
+  createBanyakPeserta: adminProcedure
     .input(z.array(insertPesertaSchema))
     .mutation(async ({ ctx, input }) => {
       const parseDate = (val?: string) =>
@@ -153,7 +153,7 @@ export const pesertaRouter = createTRPCRouter({
         .onConflictDoNothing({ target: pesertaDidik.nipd });
     }),
 
-  updatePeserta: protectedProcedure
+  updatePeserta: adminProcedure
     .input(
       insertPesertaSchema.extend({
         id: z.string(),
@@ -217,7 +217,7 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(pesertaDidik.id, input.id));
     }),
 
-  deletePeserta: protectedProcedure
+  deletePeserta: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return await ctx.db
@@ -225,13 +225,13 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(pesertaDidik.id, input.id));
     }),
 
-  getAllKelas: protectedProcedure.query(async ({ ctx }) => {
+  getAllKelas: adminProcedure.query(async ({ ctx }) => {
     return await ctx.db.query.kelas.findMany({
       orderBy: [asc(kelas.jenjang), asc(kelas.tingkat), asc(kelas.namaKelas)],
     });
   }),
 
-  downloadExcel: protectedProcedure.mutation(async ({ ctx }) => {
+  downloadExcel: adminProcedure.mutation(async ({ ctx }) => {
     const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
     const jenjangList = ["SD", "SMP", "SMA"] as const;
@@ -391,7 +391,7 @@ export const pesertaRouter = createTRPCRouter({
     return Buffer.from(buffer).toString("base64");
   }),
 
-  downloadQrZip: protectedProcedure.mutation(async ({ ctx }) => {
+  downloadQrZip: adminProcedure.mutation(async ({ ctx }) => {
     const allPeserta = await ctx.db
       .select({
         nipd: pesertaDidik.nipd,
@@ -441,7 +441,7 @@ export const pesertaRouter = createTRPCRouter({
     return content.toString("base64");
   }),
 
-  createKelas: protectedProcedure
+  createKelas: adminProcedure
     .input(
       z.object({
         jenjang: z.enum(["SD", "SMP", "SMA"]),
@@ -457,7 +457,7 @@ export const pesertaRouter = createTRPCRouter({
       });
     }),
 
-  updateKelas: protectedProcedure
+  updateKelas: adminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -477,7 +477,7 @@ export const pesertaRouter = createTRPCRouter({
         .where(eq(kelas.id, input.id));
     }),
 
-  deleteKelas: protectedProcedure
+  deleteKelas: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return await ctx.db.delete(kelas).where(eq(kelas.id, input.id));

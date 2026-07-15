@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import { and, eq, gte, lte, isNotNull, arrayContains } from "drizzle-orm";
 import {
   logAbsensi,
@@ -14,7 +14,7 @@ import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 
 export const rekapRouter = createTRPCRouter({
-  generateExcel: protectedProcedure
+  generateExcel: adminProcedure
     .input(
       z.object({
         jenjang: z.enum(["SD", "SMP", "SMA"]),

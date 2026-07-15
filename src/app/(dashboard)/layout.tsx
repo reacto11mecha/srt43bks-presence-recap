@@ -61,7 +61,7 @@ export default async function DashboardLayout({
                 </SheetTrigger>
                 <SheetContent side="left" className="w-64 p-0">
                   <SheetTitle className="sr-only">Menu Navigasi</SheetTitle>
-                  <Sidebar />
+                  <Sidebar role={currentUser.jabatan.role} />
                 </SheetContent>
               </Sheet>
             </div>
