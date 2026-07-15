@@ -1,0 +1,49 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prescap-web
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://prescap:prescap@db:5432/prescap
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=rahasia_super_aman_ganti_ini
+      - BETTER_AUTH_GOOGLE_CLIENT_ID=""
+      - BETTER_AUTH_GOOGLE_CLIENT_SECRET=""
+    networks:
+      - prescap-network
+
+  db:
+    image: postgres:16
+    container_name: prescap-db
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-U", "prescap", "-d", "prescap"]
+      interval: 3s
+      retries: 10
+      start_period: 30s
+    environment:
+      POSTGRES_DB: prescap
+      POSTGRES_USER: prescap
+      POSTGRES_PASSWORD: prescap
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - prescap-network
+
+volumes:
+  db_data:
+
+networks:
+  prescap-network:
+    driver: bridge
