@@ -18,6 +18,7 @@ export default function ScannerClient({
 }: ScannerClientProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
+  const scannerInstanceIdRef = useRef(0);
   const isPausedRef = useRef(isPaused);
   const onScanRef = useRef(onScan);
 
@@ -35,6 +36,8 @@ export default function ScannerClient({
     const video = videoRef.current;
     if (!video) return;
 
+    const currentInstanceId = ++scannerInstanceIdRef.current; // ID unik untuk instance ini
+
     const scanner = new QrScanner(
       video,
       (result) => {
@@ -44,39 +47,59 @@ export default function ScannerClient({
       },
       {
         maxScansPerSecond: 10,
-        highlightCodeOutline: true, // menampilkan outline hijau di sekitar QR (opsional)
-        // Anda bisa tambahkan opsi lain sesuai kebutuhan
+        highlightCodeOutline: true,
       },
     );
     scannerRef.current = scanner;
 
     const startScanner = async () => {
       try {
-        let cameraOptions: {
-          deviceId?: string;
-          facingMode?: "environment" | "user";
-        } = {};
+        // Ekstrak kamera yang diinginkan
+        let targetCamera: string | undefined;
 
         if (typeof cameraConfig === "string") {
-          cameraOptions.deviceId = cameraConfig;
+          targetCamera = cameraConfig;
         } else if (cameraConfig && typeof cameraConfig === "object") {
-          if ("deviceId" in cameraConfig && cameraConfig.deviceId) {
-            if (typeof cameraConfig.deviceId === "string") {
-              cameraOptions.deviceId = cameraConfig.deviceId;
-            } else if (
-              typeof cameraConfig.deviceId === "object" &&
-              "exact" in cameraConfig.deviceId
-            ) {
-              cameraOptions.deviceId = cameraConfig.deviceId.exact;
+          if (
+            "deviceId" in cameraConfig &&
+            cameraConfig.deviceId &&
+            typeof cameraConfig.deviceId === "object" &&
+            "exact" in cameraConfig.deviceId
+          ) {
+            const exactVal = cameraConfig.deviceId.exact;
+            if (typeof exactVal === "string") {
+              targetCamera = exactVal;
+            } else if (Array.isArray(exactVal) && exactVal.length > 0) {
+              targetCamera = exactVal[0];
             }
-          } else if ("facingMode" in cameraConfig) {
-            cameraOptions.facingMode = cameraConfig.facingMode as
-              "environment" | "user";
+          } else if (
+            "deviceId" in cameraConfig &&
+            typeof cameraConfig.deviceId === "string"
+          ) {
+            targetCamera = cameraConfig.deviceId;
+          } else if ("facingMode" in cameraConfig && cameraConfig.facingMode) {
+            targetCamera = cameraConfig.facingMode as string;
           }
         }
 
-        await scanner.start(cameraOptions);
+        // Atur kamera jika ada
+        if (targetCamera) {
+          await scanner.setCamera(targetCamera);
+        }
+
+        // Cek apakah instance ini masih yang terbaru
+        if (currentInstanceId !== scannerInstanceIdRef.current) {
+          // Scanner sudah diganti (destroyed), hentikan
+          return;
+        }
+
+        // Mulai scan
+        await scanner.start();
       } catch (err) {
+        // Jika instance sudah tidak relevan, abaikan error (misal karena destroyed)
+        if (currentInstanceId !== scannerInstanceIdRef.current) {
+          return;
+        }
         if (onError) {
           onError(`Gagal mengakses kamera: ${String(err)}`);
         }
@@ -86,6 +109,7 @@ export default function ScannerClient({
     startScanner();
 
     return () => {
+      // Stop dan destroy scanner
       if (scannerRef.current) {
         scannerRef.current.stop();
         scannerRef.current.destroy();
@@ -109,16 +133,11 @@ export default function ScannerClient({
       {/* Overlay kotak penanda kuning */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <div className="relative h-64 w-64 md:h-72 md:w-72">
-          {/* Keempat sudut kotak */}
           <div className="absolute top-0 left-0 h-8 w-8 rounded-tl-lg border-t-4 border-l-4 border-yellow-400" />
           <div className="absolute top-0 right-0 h-8 w-8 rounded-tr-lg border-t-4 border-r-4 border-yellow-400" />
           <div className="absolute bottom-0 left-0 h-8 w-8 rounded-bl-lg border-b-4 border-l-4 border-yellow-400" />
           <div className="absolute right-0 bottom-0 h-8 w-8 rounded-br-lg border-r-4 border-b-4 border-yellow-400" />
-
-          {/* Garis pembatas tipis (opsional) */}
           <div className="absolute inset-0 rounded-lg border-2 border-yellow-400/30" />
-
-          {/* Efek garis pemindai (animasi) */}
           <div className="absolute inset-0 overflow-hidden rounded-lg">
             <div
               className="animate-scan absolute right-0 left-0 h-0.5 bg-yellow-400 shadow-[0_0_8px_#facc15]"

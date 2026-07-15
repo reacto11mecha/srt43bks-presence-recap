@@ -71,8 +71,8 @@ export default function ScannerPage() {
           // Validasi: harus ada waktuMulai dan waktuSelesai
           if (!s.waktuMulai || !s.waktuSelesai) return false;
 
-          const [startH, startM] = s.waktuMulai.split(":").map(Number);
-          const [endH, endM] = s.waktuSelesai.split(":").map(Number);
+          const [startH = 0, startM = 0] = s.waktuMulai.split(":").map(Number);
+          const [endH = 0, endM = 0] = s.waktuSelesai.split(":").map(Number);
 
           // Validasi parsing
           if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM))

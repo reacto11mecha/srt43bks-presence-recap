@@ -13,6 +13,32 @@ import ExcelJS from "exceljs";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 
+// ============================================================
+// TIPE LOKAL UNTUK AGGREGASI
+// ============================================================
+type RingkasanRow = {
+  id: string;
+  nipd: string;
+  namaLengkap: string;
+  agama: string;
+  tingkat: string;
+  namaKelas: string;
+  sakit: number;
+  izin: number;
+  alfa: number;
+  totalPoin: number;
+  [key: string]: string | number; // untuk kolom dinamis per sesi
+};
+
+type DetailRow = {
+  tanggal: string;
+  nipd: string;
+  nama: string;
+  agama: string;
+  totalPoinHarian: number;
+  [key: string]: string | number; // untuk ket_... dan pn_...
+};
+
 export const rekapRouter = createTRPCRouter({
   generateExcel: adminProcedure
     .input(
@@ -44,7 +70,7 @@ export const rekapRouter = createTRPCRouter({
           kategori: kategoriAbsensi.namaKategori,
           isMandatory: sesiAbsensi.isMandatory,
           targetAgama: sesiAbsensi.targetAgama,
-          poinAlfa: sesiAbsensi.poinAlfa, // ← ambil poin alfa
+          poinAlfa: sesiAbsensi.poinAlfa,
         })
         .from(sesiAbsensi)
         .innerJoin(
@@ -106,13 +132,18 @@ export const rekapRouter = createTRPCRouter({
         )
         .where(and(dateFilter, isNotNull(logAbsensi.pelanggaranId)));
 
-      // 3. AGREGASI RINGKASAN (tetap, tidak diubah)
-      const studentStats = new Map<string, any>();
+      // 3. AGREGASI RINGKASAN
+      const studentStats = new Map<string, RingkasanRow>();
       for (const s of students) {
         const sessionPoints: Record<string, number> = {};
         sessions.forEach((ses) => (sessionPoints[`sesi_${ses.id}`] = 0));
         studentStats.set(s.id, {
-          ...s,
+          id: s.id,
+          nipd: s.nipd,
+          namaLengkap: s.namaLengkap,
+          agama: s.agama,
+          tingkat: s.tingkat,
+          namaKelas: s.namaKelas,
           ...sessionPoints,
           sakit: 0,
           izin: 0,
@@ -124,7 +155,9 @@ export const rekapRouter = createTRPCRouter({
         const stat = studentStats.get(log.pesertaDidikId);
         if (!stat) continue;
         if (log.sesiId) {
-          stat[`sesi_${log.sesiId}`] += log.poinDidapat;
+          // 🔧 FIX: pastikan nilai diakses sebagai number
+          stat[`sesi_${log.sesiId}`] =
+            (stat[`sesi_${log.sesiId}`] as number) + log.poinDidapat;
           stat.totalPoin += log.poinDidapat;
           if (log.statusKehadiran === "SAKIT") stat.sakit += 1;
           else if (log.statusKehadiran === "IZIN") stat.izin += 1;
@@ -135,14 +168,12 @@ export const rekapRouter = createTRPCRouter({
             stat.alfa += 1;
         }
       }
-      const ringkasanByTingkat: Record<string, any[]> = {};
+      const ringkasanByTingkat: Record<string, RingkasanRow[]> = {};
       for (const stat of studentStats.values()) {
-        if (!ringkasanByTingkat[stat.tingkat])
-          ringkasanByTingkat[stat.tingkat] = [];
-        ringkasanByTingkat[stat.tingkat].push(stat);
+        (ringkasanByTingkat[stat.tingkat] ??= []).push(stat);
       }
 
-      // 4. AGREGASI DETAIL HARIAN (dengan pengecekan targetAgama & poinAlfa)
+      // 4. AGREGASI DETAIL HARIAN
       const logMap = new Map<string, (typeof sessionLogs)[0]>();
       for (const log of sessionLogs) {
         const key = `${log.tanggal}_${log.pesertaDidikId}_${log.sesiId}`;
@@ -157,13 +188,13 @@ export const rekapRouter = createTRPCRouter({
         cursor.setDate(cursor.getDate() + 1);
       }
 
-      const detailByTingkat: Record<string, any[]> = {};
+      const detailByTingkat: Record<string, DetailRow[]> = {};
       const tingkatKeys = Object.keys(ringkasanByTingkat).sort(
         (a, b) => Number(a) - Number(b),
       );
 
       for (const t of tingkatKeys) {
-        const rows: any[] = [];
+        const rows: DetailRow[] = [];
         const siswaTingkat = students
           .filter((s) => s.tingkat === t)
           .sort(
@@ -174,7 +205,7 @@ export const rekapRouter = createTRPCRouter({
 
         for (const tanggal of dateList) {
           for (const siswa of siswaTingkat) {
-            const row: any = {
+            const row: DetailRow = {
               tanggal,
               nipd: siswa.nipd,
               nama: siswa.namaLengkap,
@@ -183,7 +214,6 @@ export const rekapRouter = createTRPCRouter({
             };
 
             for (const ses of sessions) {
-              // Periksa apakah siswa termasuk target agama sesi
               if (!ses.targetAgama.includes(siswa.agama)) {
                 row[`ket_${ses.id}`] = "-";
                 row[`pn_${ses.id}`] = "-";
@@ -194,7 +224,7 @@ export const rekapRouter = createTRPCRouter({
               const log = logMap.get(key);
 
               if (log) {
-                let statusText = log.statusKehadiran;
+                let statusText: string = log.statusKehadiran;
                 if (
                   log.statusKehadiran === "HADIR" &&
                   log.statusWaktu === "TELAT"
@@ -205,11 +235,10 @@ export const rekapRouter = createTRPCRouter({
                 row[`pn_${ses.id}`] = log.poinDidapat;
                 row.totalPoinHarian += log.poinDidapat;
               } else {
-                // Tidak ada log
                 if (ses.isMandatory) {
                   row[`ket_${ses.id}`] = "ALFA";
-                  row[`pn_${ses.id}`] = ses.poinAlfa; // gunakan poin alfa sesi
-                  row.totalPoinHarian += ses.poinAlfa; // mempengaruhi total poin harian (negatif)
+                  row[`pn_${ses.id}`] = ses.poinAlfa;
+                  row.totalPoinHarian += ses.poinAlfa;
                 } else {
                   row[`ket_${ses.id}`] = "-";
                   row[`pn_${ses.id}`] = "-";
@@ -223,7 +252,7 @@ export const rekapRouter = createTRPCRouter({
         detailByTingkat[t] = rows;
       }
 
-      // 5. MEMBANGUN WORKBOOK (header & sheet pelanggaran tetap)
+      // 5. MEMBANGUN WORKBOOK
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "Sistem Presensi Asrama";
 
@@ -231,7 +260,7 @@ export const rekapRouter = createTRPCRouter({
         ws: ExcelJS.Worksheet,
         staticCols: { header: string; key: string; width: number }[],
         extraCols: { header: string; key: string; width: number }[],
-        columnsDef: any[],
+        columnsDef: { header: string; key: string; width: number }[],
       ) => {
         ws.columns = columnsDef;
         let colIdx = 1;
@@ -321,13 +350,14 @@ export const rekapRouter = createTRPCRouter({
         ];
         applyRingkasanHeader(ws, staticCols, extraCols, columnsDef);
 
-        const rows = ringkasanByTingkat[t].sort(
+        const rows = ringkasanByTingkat[t] ?? [];
+        rows.sort(
           (a, b) =>
             a.namaKelas.localeCompare(b.namaKelas) ||
             a.namaLengkap.localeCompare(b.namaLengkap),
         );
         rows.forEach((r, idx) => {
-          const rowData: any = {
+          const rowData: Record<string, string | number> = {
             no: idx + 1,
             nipd: r.nipd,
             nama: r.namaLengkap,
@@ -339,7 +369,8 @@ export const rekapRouter = createTRPCRouter({
             totalPoin: r.totalPoin,
           };
           for (const ses of sessions) {
-            rowData[`sesi_${ses.id}`] = r[`sesi_${ses.id}`];
+            // 🔧 FIX: pastikan nilai bukan undefined, fallback ke 0
+            rowData[`sesi_${ses.id}`] = r[`sesi_${ses.id}`] ?? 0;
           }
           ws.addRow(rowData);
         });
@@ -459,9 +490,9 @@ export const rekapRouter = createTRPCRouter({
         ws.getRow(2).height = 20;
         ws.getRow(3).height = 18;
 
-        const rows = detailByTingkat[t] || [];
+        const rows = detailByTingkat[t] ?? [];
         rows.forEach((r) => {
-          const rowData: any = {
+          const rowData: Record<string, string | number> = {
             tanggal: format(new Date(r.tanggal), "dd MMM yyyy", {
               locale: localeId,
             }),
@@ -471,8 +502,9 @@ export const rekapRouter = createTRPCRouter({
             totalPoinHarian: r.totalPoinHarian,
           };
           for (const ses of sessions) {
-            rowData[`ket_${ses.id}`] = r[`ket_${ses.id}`];
-            rowData[`pn_${ses.id}`] = r[`pn_${ses.id}`];
+            // 🔧 FIX: fallback untuk ket dan pn
+            rowData[`ket_${ses.id}`] = r[`ket_${ses.id}`] ?? "-";
+            rowData[`pn_${ses.id}`] = r[`pn_${ses.id}`] ?? 0;
           }
           ws.addRow(rowData);
         });

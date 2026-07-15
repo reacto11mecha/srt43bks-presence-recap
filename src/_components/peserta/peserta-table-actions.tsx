@@ -222,7 +222,7 @@ export function PesertaTableActions() {
       petunjukData.forEach((row) => {
         const r = sheetPetunjuk.addRow(row);
         r.alignment = { wrapText: true, vertical: "top" };
-        if (row[0].startsWith("---")) {
+        if (row[0]?.startsWith("---")) {
           r.font = { bold: true };
           r.fill = {
             type: "pattern",

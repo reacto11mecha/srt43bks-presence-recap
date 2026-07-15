@@ -25,7 +25,15 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function KategoriFormDialog({ initialData }: { initialData?: any }) {
+interface KategoriFormDialogProps {
+  initialData?: {
+    id: string;
+    namaKategori: string;
+    isActive: boolean;
+  };
+}
+
+export function KategoriFormDialog({ initialData }: KategoriFormDialogProps) {
   const [open, setOpen] = useState(false);
   const utils = api.useUtils();
 
@@ -37,25 +45,33 @@ export function KategoriFormDialog({ initialData }: { initialData?: any }) {
     },
   });
 
-  const mutation = api.pengaturan[
-    initialData ? "updateKategori" : "createKategori"
-  ].useMutation({
+  // Mutation terpisah untuk create dan update
+  const createMutation = api.pengaturan.createKategori.useMutation({
     onSuccess: () => {
-      toast.success(
-        `Kategori berhasil ${initialData ? "diperbarui" : "dibuat"}`,
-      );
+      toast.success("Kategori berhasil dibuat");
       utils.pengaturan.getKategoriWithSesi.invalidate();
       setOpen(false);
-      if (!initialData) form.reset();
+      form.reset();
     },
     onError: (e) => toast.error(e.message),
   });
 
+  const updateMutation = api.pengaturan.updateKategori.useMutation({
+    onSuccess: () => {
+      toast.success("Kategori berhasil diperbarui");
+      utils.pengaturan.getKategoriWithSesi.invalidate();
+      setOpen(false);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const onSubmit = (data: FormValues) => {
     if (initialData) {
-      mutation.mutate({ id: initialData.id, ...data });
+      updateMutation.mutate({ id: initialData.id, ...data });
     } else {
-      mutation.mutate(data);
+      createMutation.mutate(data);
     }
   };
 
@@ -86,7 +102,6 @@ export function KategoriFormDialog({ initialData }: { initialData?: any }) {
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-6">
-          {/* Nama Kategori */}
           <Controller
             name="namaKategori"
             control={form.control}
@@ -108,7 +123,6 @@ export function KategoriFormDialog({ initialData }: { initialData?: any }) {
             )}
           />
 
-          {/* Status Aktif */}
           <Controller
             name="isActive"
             control={form.control}
@@ -137,7 +151,7 @@ export function KategoriFormDialog({ initialData }: { initialData?: any }) {
           />
 
           <div className="flex justify-end pt-4">
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={isPending}>
               Simpan Kategori
             </Button>
           </div>

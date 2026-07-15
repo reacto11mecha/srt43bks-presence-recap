@@ -179,7 +179,9 @@ export default function DashboardInsightPage() {
 
           <Select
             value={tingkat || "SEMUA"}
-            onValueChange={(val) => setTingkat(val === "SEMUA" ? "" : val)}
+            onValueChange={(val) =>
+              setKelasId(val === "SEMUA" ? "" : (val ?? ""))
+            }
           >
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Semua Tingkat" />
@@ -196,7 +198,9 @@ export default function DashboardInsightPage() {
 
           <Select
             value={kelasId || "SEMUA"}
-            onValueChange={(val) => setKelasId(val === "SEMUA" ? "" : val)}
+            onValueChange={(val) =>
+              setKelasId(val === "SEMUA" ? "" : (val ?? ""))
+            }
             disabled={!tingkat}
           >
             <SelectTrigger className="w-[140px]">
@@ -342,7 +346,7 @@ export default function DashboardInsightPage() {
                 </p>
               </div>
             ) : (
-              <Accordion type="multiple" className="w-full">
+              <Accordion multiple className="w-full">
                 {sesiBermasalah?.map((grupSesi: any) => (
                   <AccordionItem
                     key={grupSesi.sesiDetail.id}
