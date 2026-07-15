@@ -1,61 +1,29 @@
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
 import tseslint from "typescript-eslint";
-// @ts-ignore -- no types for this plugin
+// @ts-expect-error -- no types for this plugin
 import drizzle from "eslint-plugin-drizzle";
 
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-});
+const eslintConfig = defineConfig([
+  // 1. Next.js base configurations
+  ...nextVitals,
 
-export default tseslint.config(
+  // 2. TypeScript configurations
+  ...tseslint.configs.recommended,
+
+  // 3. Drizzle ORM rules
   {
-    ignores: [".next"],
-  },
-  ...compat.extends("next/core-web-vitals"),
-  {
-    files: ["**/*.ts", "**/*.tsx"],
     plugins: {
       drizzle,
     },
-    extends: [
-      ...tseslint.configs.recommended,
-      ...tseslint.configs.recommendedTypeChecked,
-      ...tseslint.configs.stylisticTypeChecked,
-    ],
     rules: {
-      "@typescript-eslint/array-type": "off",
-      "@typescript-eslint/consistent-type-definitions": "off",
-      "@typescript-eslint/consistent-type-imports": [
-        "warn",
-        { prefer: "type-imports", fixStyle: "inline-type-imports" },
-      ],
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_" },
-      ],
-      "@typescript-eslint/require-await": "off",
-      "@typescript-eslint/no-misused-promises": [
-        "error",
-        { checksVoidReturn: { attributes: false } },
-      ],
-      "drizzle/enforce-delete-with-where": [
-        "error",
-        { drizzleObjectName: ["db", "ctx.db"] },
-      ],
-      "drizzle/enforce-update-with-where": [
-        "error",
-        { drizzleObjectName: ["db", "ctx.db"] },
-      ],
+      "drizzle/enforce-delete-with-where": "error",
+      "drizzle/enforce-update-with-where": "error",
     },
   },
-  {
-    linterOptions: {
-      reportUnusedDisableDirectives: true,
-    },
-    languageOptions: {
-      parserOptions: {
-        projectService: true,
-      },
-    },
-  },
-);
+
+  // 4. Files to ignore
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+]);
+
+export default eslintConfig;

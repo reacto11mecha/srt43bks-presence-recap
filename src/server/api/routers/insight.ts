@@ -245,7 +245,7 @@ export const insightRouter = createTRPCRouter({
             );
 
             let statusKehadiran = log?.statusKehadiran ?? "ALFA";
-            let statusWaktu = log?.statusWaktu;
+            const statusWaktu = log?.statusWaktu;
             let poin: number;
             let isMasalah = false;
 

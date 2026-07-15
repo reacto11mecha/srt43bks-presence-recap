@@ -68,25 +68,29 @@ export default function ScannerPage() {
         kategoriId: k.id,
         namaKategori: k.namaKategori,
         sesi: k.sesi.filter((s) => {
-          // Validasi: harus ada waktuMulai dan waktuSelesai
-          if (!s.waktuMulai || !s.waktuSelesai) return false;
+          // Jika tidak ada waktu, lewati filter waktu
+          if (!s.waktuMulai || !s.waktuSelesai) {
+            if (!searchSesi) return true;
+            const keyword = searchSesi.toLowerCase();
+            return (
+              s.namaSesi.toLowerCase().includes(keyword) ||
+              k.namaKategori.toLowerCase().includes(keyword)
+            );
+          }
 
           const [startH = 0, startM = 0] = s.waktuMulai.split(":").map(Number);
           const [endH = 0, endM = 0] = s.waktuSelesai.split(":").map(Number);
 
-          // Validasi parsing
           if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM))
             return false;
 
           const startMinutes = startH * 60 + startM;
           const endMinutes = endH * 60 + endM;
 
-          // Tampilkan jika sudah masuk 30 menit sebelum mulai
+          // Rentang waktu yang diizinkan
           if (currentMinutes < startMinutes - 30) return false;
-          // Jangan tampilkan jika sudah lewat 1 jam setelah selesai
           if (currentMinutes > endMinutes + 60) return false;
 
-          // Filter pencarian
           if (!searchSesi) return true;
           const keyword = searchSesi.toLowerCase();
           return (

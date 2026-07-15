@@ -33,8 +33,6 @@ export async function checkHasPassword(): Promise<boolean> {
     headers: await headers(),
   });
 
-  console.log(accounts);
-
   return accounts.some((acc) => acc.providerId === "credential");
 }
 
