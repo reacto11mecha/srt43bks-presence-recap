@@ -60,7 +60,7 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
     align: "center",
   });
 
-  doc.setFontSize(11);
+  doc.setFontSize(14);
   doc.text(
     "PUSAT PENDIDIKAN, PELATIHAN DAN PENGEMBANGAN PROFESI",
     pageWidth / 2,
@@ -68,7 +68,7 @@ export async function generateLaporanSesiPdf(data: PdfDataPayload) {
     { align: "center" },
   );
 
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.text(
     "SEKOLAH RAKYAT TERINTEGRASI 1 KABUPATEN BEKASI",
     pageWidth / 2,

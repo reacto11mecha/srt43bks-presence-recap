@@ -341,41 +341,41 @@ export const insightRouter = createTRPCRouter({
       return pelanggaranHariIni;
     }),
 
-  // --------------------------------------------------------
-  // E. WALL OF FAME (Top Poin Positif)
-  // --------------------------------------------------------
-  getWallOfFame: staffProcedure
-    .input(
-      insightFilterSchema.extend({
-        limit: z.number().default(5),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      const topStudents = await ctx.db
-        .select({
-          pesertaId: pesertaDidik.id,
-          namaLengkap: pesertaDidik.namaLengkap,
-          kelasTingkat: kelas.tingkat,
-          kelasNama: kelas.namaKelas,
-          totalPoin: sql<number>`sum(${logAbsensi.poinDidapat})`.mapWith(
-            Number,
-          ),
-        })
-        .from(logAbsensi)
-        .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
-        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
-        .where(
-          and(
-            eq(logAbsensi.tanggal, input.tanggal),
-            eq(kelas.jenjang, input.jenjang),
-            input.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
-            input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
-          ),
-        )
-        .groupBy(pesertaDidik.id, kelas.id)
-        .orderBy(desc(sql`sum(${logAbsensi.poinDidapat})`))
-        .limit(input.limit);
+  // // --------------------------------------------------------
+  // // E. WALL OF FAME (Top Poin Positif)
+  // // --------------------------------------------------------
+  // getWallOfFame: staffProcedure
+  //   .input(
+  //     insightFilterSchema.extend({
+  //       limit: z.number().default(5),
+  //     }),
+  //   )
+  //   .query(async ({ ctx, input }) => {
+  //     const topStudents = await ctx.db
+  //       .select({
+  //         pesertaId: pesertaDidik.id,
+  //         namaLengkap: pesertaDidik.namaLengkap,
+  //         kelasTingkat: kelas.tingkat,
+  //         kelasNama: kelas.namaKelas,
+  //         totalPoin: sql<number>`sum(${logAbsensi.poinDidapat})`.mapWith(
+  //           Number,
+  //         ),
+  //       })
+  //       .from(logAbsensi)
+  //       .innerJoin(pesertaDidik, eq(logAbsensi.pesertaDidikId, pesertaDidik.id))
+  //       .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+  //       .where(
+  //         and(
+  //           eq(logAbsensi.tanggal, input.tanggal),
+  //           eq(kelas.jenjang, input.jenjang),
+  //           input.tingkat ? eq(kelas.tingkat, input.tingkat) : undefined,
+  //           input.kelasId ? eq(kelas.id, input.kelasId) : undefined,
+  //         ),
+  //       )
+  //       .groupBy(pesertaDidik.id, kelas.id)
+  //       .orderBy(desc(sql`sum(${logAbsensi.poinDidapat})`))
+  //       .limit(input.limit);
 
-      return topStudents;
-    }),
+  //     return topStudents;
+  //   }),
 });

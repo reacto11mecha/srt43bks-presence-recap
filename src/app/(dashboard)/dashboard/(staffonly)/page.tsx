@@ -38,7 +38,7 @@ import {
 // ---------- tipe dari router insight ----------
 type SesiBermasalahItem = RouterOutputs["insight"]["getEvaluasiSesi"][number];
 type PelanggaranItem = RouterOutputs["insight"]["getDaftarPelanggaran"][number];
-type WallOfFameItem = RouterOutputs["insight"]["getWallOfFame"][number];
+// type WallOfFameItem = RouterOutputs["insight"]["getWallOfFame"][number];
 
 const getStatusBadge = (status: string, isMissing?: boolean) => {
   if (isMissing)
@@ -119,8 +119,8 @@ export default function DashboardInsightPage() {
     api.insight.getEvaluasiSesi.useQuery(queryFilter);
   const { data: pelanggaran, isLoading: loadingPelanggaran } =
     api.insight.getDaftarPelanggaran.useQuery(queryFilter);
-  const { data: wallOfFame, isLoading: loadingWof } =
-    api.insight.getWallOfFame.useQuery({ ...queryFilter, limit: 5 });
+  // const { data: wallOfFame, isLoading: loadingWof } =
+  //   api.insight.getWallOfFame.useQuery({ ...queryFilter, limit: 5 });
 
   // ---------- reset filter langsung di handler (tidak pakai useEffect) ----------
   const handleJenjangChange = (val: string | null) => {
@@ -481,7 +481,8 @@ export default function DashboardInsightPage() {
         </Card>
       </div>
 
-      {/* WALL OF FAME */}
+      {/*
+      dibuat agar bisa wall of fame sebulan
       <Card className="border-indigo-100 bg-gradient-to-br from-indigo-50 to-blue-50 shadow-md">
         <CardHeader className="pb-2 text-center">
           <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full border border-yellow-200 bg-yellow-100 shadow-sm">
@@ -539,7 +540,7 @@ export default function DashboardInsightPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card> */}
     </div>
   );
 }
