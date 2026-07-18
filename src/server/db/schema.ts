@@ -383,8 +383,8 @@ export const penangananKasus = pgTable("penanganan_kasus", {
   terminasiSpiritual: text("terminasi_spiritual"),
   kesimpulan: text("kesimpulan"),
 
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
@@ -409,9 +409,17 @@ export const monitoringPerkembangan = pgTable("monitoring_perkembangan", {
 
   // --- A - D: PENILAIAN MATRIKS SKOR (1-5) ---
   skorAdl: jsonb("skor_adl").$type<Record<string, number>>(),
+  totalSkorAdl: integer("total_skor_adl").notNull().default(0),
+
   skorSosial: jsonb("skor_sosial").$type<Record<string, number>>(),
+  totalSkorSosial: integer("total_skor_sosial").notNull().default(0),
+
   skorMental: jsonb("skor_mental").$type<Record<string, number>>(),
+  totalSkorMental: integer("total_skor_mental").notNull().default(0),
+
   skorVokasional: jsonb("skor_vokasional").$type<Record<string, number>>(),
+  totalSkorVokasional: integer("total_skor_vokasional").notNull().default(0),
+
   totalSkorKeseluruhan: integer("total_skor_keseluruhan").notNull().default(0),
 
   // --- E. PERKEMBANGAN PEMECAHAN MASALAH / KASUS ---
@@ -425,8 +433,8 @@ export const monitoringPerkembangan = pgTable("monitoring_perkembangan", {
   kegiatanPositif: text("kegiatan_positif"),
   pelanggaranSanksi: text("pelanggaran_sanksi"),
 
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
     .defaultNow()
     .notNull()
     .$onUpdate(() => new Date()),
