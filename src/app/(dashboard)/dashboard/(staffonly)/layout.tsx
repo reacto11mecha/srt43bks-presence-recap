@@ -29,7 +29,7 @@ export default async function ProtectedSuperStaffLayout({
     redirect("/");
   }
 
-  if (!["SUPERADMIN", "STAFFF"].includes(currentUser.jabatan.role)) {
+  if (!["SUPERADMIN", "STAFF"].includes(currentUser.jabatan.role)) {
     redirect("/dashboard/aktivitas");
   }
 

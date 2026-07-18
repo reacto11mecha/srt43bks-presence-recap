@@ -9,6 +9,7 @@ import {
   Settings,
   ScrollText,
   QrCode,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 
@@ -29,6 +30,11 @@ export function Sidebar({
             icon: ScrollText,
           },
           { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
+          {
+            name: "Bimbingan & Evaluasi",
+            href: "/dashboard/bimbingan",
+            icon: ClipboardList,
+          },
           { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
           {
             name: "Pengaturan Sistem",
@@ -45,6 +51,11 @@ export function Sidebar({
               icon: ScrollText,
             },
             { name: "Rekap Laporan", href: "/dashboard/rekap", icon: FileText },
+            {
+              name: "Bimbingan & Evaluasi",
+              href: "/dashboard/bimbingan",
+              icon: ClipboardList,
+            },
             { name: "Data Peserta", href: "/dashboard/peserta", icon: Users },
           ]
         : [
@@ -69,7 +80,7 @@ export function Sidebar({
           href="/dashboard"
           className="text-primary flex items-center gap-2 font-bold"
         >
-          <span className="text-lg tracking-tight">Sistem Presensi</span>
+          <span className="text-lg tracking-tight">ASRI SRT 1 Kab. Bekasi</span>
         </Link>
       </div>
 

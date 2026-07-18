@@ -5,6 +5,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  jsonb,
   text,
   time,
   timestamp,
@@ -330,6 +331,108 @@ export const logAbsensi = pgTable(
 );
 
 // ==========================================
+// FORM PENCATATAN
+// ==========================================
+export const penangananKasus = pgTable("penanganan_kasus", {
+  id: text("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  pesertaDidikId: text("peserta_didik_id")
+    .notNull()
+    .references(() => pesertaDidik.id, { onDelete: "cascade" }),
+  authorId: text("author_id").references(() => user.id, {
+    onDelete: "set null",
+  }),
+
+  tanggalBuka: date("tanggal_buka").notNull(),
+  tanggalTutup: date("tanggal_tutup"),
+
+  // --- 1. GAMBARAN PERMASALAHAN ---
+  masalahUtama: text("masalah_utama"),
+  penyebabMasalah: text("penyebab_masalah"),
+  dampakBiologis: text("dampak_biologis"),
+  dampakPsikologis: text("dampak_psikologis"),
+  dampakSosial: text("dampak_sosial"),
+  dampakSpiritual: text("dampak_spiritual"),
+
+  // --- 2. RENCANA INTERVENSI ---
+  tujuanUmum: text("tujuan_umum"),
+  tujuanKhusus: jsonb("tujuan_khusus").$type<string[]>(),
+  rencanaKegiatan: jsonb("rencana_kegiatan").$type<string[]>(),
+
+  // --- 3. INTERVENSI YANG DILAKUKAN ---
+  // Array of object: [{ aktivitasKe: 1, deskripsi: "..." }]
+  intervensi:
+    jsonb("intervensi").$type<
+      Array<{ aktivitasKe: number; deskripsi: string }>
+    >(),
+
+  // --- 4. MONITORING DAN EVALUASI (MONEV) ---
+  metodeMonev: jsonb("metode_monev").$type<string[]>(),
+  // Array of object: [{ mingguKe: 1, deskripsi: "..." }]
+  hasilMonev:
+    jsonb("hasil_monev").$type<
+      Array<{ mingguKe: number; deskripsi: string }>
+    >(),
+
+  // --- 5. TERMINASI (PENGAKHIRAN KASUS) ---
+  terminasiBiologis: text("terminasi_biologis"),
+  terminasiPsikologis: text("terminasi_psikologis"),
+  terminasiSosial: text("terminasi_sosial"),
+  terminasiSpiritual: text("terminasi_spiritual"),
+  kesimpulan: text("kesimpulan"),
+
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export const monitoringPerkembangan = pgTable("monitoring_perkembangan", {
+  id: text("id")
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  pesertaDidikId: text("peserta_didik_id")
+    .notNull()
+    .references(() => pesertaDidik.id, { onDelete: "cascade" }),
+  authorId: text("author_id").references(() => user.id, {
+    onDelete: "set null",
+  }), // Tambahan relasi foreign key
+
+  // --- METADATA LAPORAN ---
+  monevKe: integer("monev_ke").notNull(),
+  periodeBulan: text("periode_bulan").notNull(),
+  periodeTahun: text("periode_tahun").notNull(),
+
+  // --- A - D: PENILAIAN MATRIKS SKOR (1-5) ---
+  skorAdl: jsonb("skor_adl").$type<Record<string, number>>(),
+  skorSosial: jsonb("skor_sosial").$type<Record<string, number>>(),
+  skorMental: jsonb("skor_mental").$type<Record<string, number>>(),
+  skorVokasional: jsonb("skor_vokasional").$type<Record<string, number>>(),
+  totalSkorKeseluruhan: integer("total_skor_keseluruhan").notNull().default(0),
+
+  // --- E. PERKEMBANGAN PEMECAHAN MASALAH / KASUS ---
+  masalahKasus: text("masalah_kasus"),
+  penyebabKasus: text("penyebab_kasus"),
+  akibatKasus: text("akibat_kasus"),
+  langkahKasus: text("langkah_kasus"),
+  rencanaTindakLanjut: text("rencana_tindak_lanjut"),
+
+  // --- F. PENILAIAN SECARA UMUM ---
+  kegiatanPositif: text("kegiatan_positif"),
+  pelanggaranSanksi: text("pelanggaran_sanksi"),
+
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+// ==========================================
 // DRIZZLE RELATIONS (Untuk mempermudah query .with())
 // ==========================================
 export const masterJabatanRelations = relations(masterJabatan, ({ many }) => ({
@@ -344,6 +447,8 @@ export const userRelations = relations(user, ({ many, one }) => ({
     fields: [user.jabatanId],
     references: [masterJabatan.id],
   }),
+  kasusDibuat: many(penangananKasus),
+  laporanDibuat: many(monitoringPerkembangan),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
@@ -411,5 +516,35 @@ export const pesertaDidikRelations = relations(
       references: [kelas.id],
     }),
     logAbsensi: many(logAbsensi),
+    riwayatKasus: many(penangananKasus),
+    riwayatPerkembangan: many(monitoringPerkembangan),
+  }),
+);
+
+export const penangananKasusRelations = relations(
+  penangananKasus,
+  ({ one }) => ({
+    pesertaDidik: one(pesertaDidik, {
+      fields: [penangananKasus.pesertaDidikId],
+      references: [pesertaDidik.id],
+    }),
+    author: one(user, {
+      fields: [penangananKasus.authorId],
+      references: [user.id],
+    }),
+  }),
+);
+
+export const monitoringPerkembanganRelations = relations(
+  monitoringPerkembangan,
+  ({ one }) => ({
+    pesertaDidik: one(pesertaDidik, {
+      fields: [monitoringPerkembangan.pesertaDidikId],
+      references: [pesertaDidik.id],
+    }),
+    author: one(user, {
+      fields: [monitoringPerkembangan.authorId],
+      references: [user.id],
+    }),
   }),
 );

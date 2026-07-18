@@ -65,6 +65,10 @@ export default async function DashboardLayout({
                 </SheetContent>
               </Sheet>
             </div>
+
+            <h2 className="hidden text-lg font-semibold sm:block">
+              Absensi Sekolah Rakyat Terintegrasi
+            </h2>
           </div>
 
           {/* PROFIL KANAN ATAS */}

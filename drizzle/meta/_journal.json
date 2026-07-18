@@ -8,6 +8,13 @@
       "when": 1784130171748,
       "tag": "0000_true_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784338785956,
+      "tag": "0001_lying_lester",
+      "breakpoints": true
     }
   ]
 }
