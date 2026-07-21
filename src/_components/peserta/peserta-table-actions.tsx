@@ -539,9 +539,7 @@ export function PesertaTableActions() {
               Batal
             </Button>
             <Button
-              onClick={() =>
-                createBanyakPesertaMutation.mutate(previewData as any)
-              }
+              onClick={() => createBanyakPesertaMutation.mutate(previewData)}
               disabled={createBanyakPesertaMutation.isPending}
             >
               {createBanyakPesertaMutation.isPending && (

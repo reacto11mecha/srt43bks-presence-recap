@@ -55,18 +55,48 @@ const insertPesertaSchema = z.object({
   nikAyah: z.string().optional(),
 });
 
+const getAllInputSchema = z.object({
+  jenjang: z.enum(["SD", "SMP", "SMA"]).optional(),
+  tingkat: z.string().optional(),
+  kelasId: z.string().optional(),
+});
+
 export type InsertPesertaType = z.infer<typeof insertPesertaSchema>;
 
 export const pesertaRouter = createTRPCRouter({
-  getAll: staffProcedure.query(async ({ ctx }) => {
-    return await ctx.db.query.pesertaDidik.findMany({
-      with: {
-        kelas: true,
-        waliAsuh: true,
-      },
-      orderBy: [desc(pesertaDidik.createdAt)],
-    });
-  }),
+  getAll: staffProcedure
+    .input(getAllInputSchema.optional())
+    .query(async ({ ctx, input }) => {
+      const conditions = [];
+      if (input?.jenjang) {
+        conditions.push(eq(kelas.jenjang, input.jenjang));
+      }
+      if (input?.tingkat) {
+        conditions.push(eq(kelas.tingkat, input.tingkat));
+      }
+      if (input?.kelasId) {
+        conditions.push(eq(pesertaDidik.kelasId, input.kelasId));
+      }
+
+      const rows = await ctx.db
+        .select({
+          peserta: pesertaDidik,
+          kelas: kelas,
+          waliAsuh: user,
+        })
+        .from(pesertaDidik)
+        .innerJoin(kelas, eq(pesertaDidik.kelasId, kelas.id))
+        .leftJoin(user, eq(pesertaDidik.waliAsuhId, user.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(pesertaDidik.createdAt));
+
+      // Transform flat join menjadi nested object sesuai ekspektasi frontend
+      return rows.map((row) => ({
+        ...row.peserta,
+        kelas: row.kelas,
+        waliAsuh: row.waliAsuh,
+      }));
+    }),
 
   assignWaliAsuh: staffProcedure
     .input(
